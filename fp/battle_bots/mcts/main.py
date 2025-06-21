@@ -1,15 +1,12 @@
+import itertools
 import logging
+import random
+from copy import deepcopy
 
-import constants
+from data.pkmn_sets import SmogonSets
 from fp.battle import Battle
 from config import FoulPlayConfig
 
-from ..helpers import (
-    fill_in_standardbattle_unknowns,
-    fill_in_randombattle_unknowns,
-    prepare_battle,
-    fill_in_battle_factory_unknowns,
-)
 from ..poke_engine_helpers import (
     get_payoff_matrix_from_mcts,
     battle_to_poke_engine_state,
@@ -23,18 +20,15 @@ class BattleBot(Battle):
         super(BattleBot, self).__init__(*args, **kwargs)
 
     def find_best_move(self):
+        # this is where set prediction / filling in unknowns happens
+
         if self.team_preview:
-            self.user.active = self.user.reserve.pop(0)
-            self.opponent.active = self.opponent.reserve.pop(0)
+            self.user.slot_a.active = self.user.reserve.pop(0)
+            self.user.slot_b.active = self.user.reserve.pop(0)
+            self.opponent.slot_a.active = self.opponent.reserve.pop(0)
+            self.opponent.slot_b.active = self.opponent.reserve.pop(0)
 
-        if self.battle_type == constants.RANDOM_BATTLE:
-            fn = fill_in_randombattle_unknowns
-        elif self.battle_type == constants.BATTLE_FACTORY:
-            fn = fill_in_battle_factory_unknowns
-        else:
-            fn = fill_in_standardbattle_unknowns
-
-        battle = prepare_battle(self, fn)
+        battles = prepare_battles(self)
 
         logger.info("Searching for a move using MCTS...")
         choice, win_percentage, num_iterations = get_payoff_matrix_from_mcts(
@@ -44,9 +38,13 @@ class BattleBot(Battle):
         logger.info("Iterations: {}".format(num_iterations))
 
         if self.team_preview:
-            self.user.reserve.insert(0, self.user.active)
-            self.user.active = None
-            self.opponent.reserve.insert(0, self.opponent.active)
-            self.opponent.active = None
+            self.user.reserve.insert(0, self.user.slot_a.active)
+            self.user.reserve.insert(0, self.user.slot_b.active)
+            self.user.slot_a.active = None
+            self.user.slot_b.active = None
+            self.opponent.reserve.insert(0, self.opponent.slot_a.active)
+            self.opponent.reserve.insert(0, self.opponent.slot_b.active)
+            self.opponent.slot_a.active = None
+            self.opponent.slot_b.active = None
 
         return choice

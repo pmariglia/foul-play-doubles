@@ -19,7 +19,7 @@ class TestPokemonInit(unittest.TestCase):
 
 class TestBattlerActiveLockedIntoMove(unittest.TestCase):
     def setUp(self):
-        self.battler = Battler()
+        self.battler = Battler("1")
         self.battler.active = Pokemon("pikachu", 100)
         self.battler.active.moves = [
             Move("thunderbolt"),

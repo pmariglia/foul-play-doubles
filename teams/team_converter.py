@@ -113,3 +113,34 @@ def export_to_dict(export_string):
         team_dict.append(pkmn_dict)
 
     return team_dict
+
+
+def packed_to_dict(packed_string):
+    ret = []
+    for pkmn_string in packed_string.split("]"):
+        this_pkmn = {}
+        (
+            nickname,
+            species,
+            item,
+            ability,
+            moves,
+            nature,
+            evs,
+            gender,
+            ivs,
+            shiny,
+            level,
+            rest,
+        ) = pkmn_string.split("|")
+
+        this_pkmn["name"] = normalize_name(species) or normalize_name(nickname)
+        this_pkmn["item"] = normalize_name(item)
+        this_pkmn["ability"] = normalize_name(ability)
+        this_pkmn["moves"] = [normalize_name(move) for move in moves.split(",") if move]
+        this_pkmn["tera_type"] = normalize_name(rest.split(",")[-1])
+        this_pkmn["level"] = int(level)
+        assert this_pkmn["tera_type"]
+        ret.append(this_pkmn)
+
+    return ret

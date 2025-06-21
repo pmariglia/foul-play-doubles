@@ -136,7 +136,11 @@ class PSWebsocketClient:
             message = ["/utm {}".format(team)]
         await self.send_message("", message)
 
+    async def hide_next(self):
+        await self.send_message("", ["/hidenext"])
+
     async def challenge_user(self, user_to_challenge, battle_format, team):
+        await self.hide_next()
         logger.info("Challenging {}...".format(user_to_challenge))
         await self.update_team(battle_format, team)
         message = ["/challenge {},{}".format(user_to_challenge, battle_format)]
@@ -147,6 +151,7 @@ class PSWebsocketClient:
         if room_name is not None:
             await self.join_room(room_name)
 
+        await self.hide_next()
         logger.info("Waiting for a {} challenge".format(battle_format))
         await self.update_team(battle_format, team)
         username = None
@@ -167,6 +172,7 @@ class PSWebsocketClient:
         await self.send_message("", message)
 
     async def search_for_match(self, battle_format, team):
+        await self.hide_next()
         logger.info("Searching for ranked {} match".format(battle_format))
         await self.update_team(battle_format, team)
         message = ["/search {}".format(battle_format)]

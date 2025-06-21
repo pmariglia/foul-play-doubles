@@ -1,13 +1,13 @@
 import logging
-from concurrent.futures import ProcessPoolExecutor
+import random
+from copy import deepcopy
 
 from poke_engine import MctsResult
 
 import constants
-from fp.battle import Battle
+from data.pkmn_sets import SmogonSets
+from fp.battle import Battle, Pokemon
 from config import FoulPlayConfig
-from .standard_battles import prepare_battles
-from .random_battles import prepare_random_battles
 
 from poke_engine import (
     State as PokeEngineState,
@@ -17,6 +17,73 @@ from poke_engine import (
 from ..poke_engine_helpers import battle_to_poke_engine_state
 
 logger = logging.getLogger(__name__)
+
+NUM_RESERVES = 2
+
+
+def team_preview_shuffle(battle):
+    """
+    poke-engine needs pkmn in the active slots all the time, even during team preview
+    """
+    battle.user.slot_a.active = battle.user.reserve.pop(0)
+    battle.user.slot_b.active = battle.user.reserve.pop(0)
+    battle.opponent.slot_a.active = battle.opponent.reserve.pop(0)
+    battle.opponent.slot_b.active = battle.opponent.reserve.pop(0)
+
+
+def sample_pkmn_to_remove(pkmn_list: list[Pokemon]):
+    # sample a non-restricted pokemon to remove if available, otherwise sample any pokemon
+    pkmn_to_sample_from = [
+        p
+        for p in pkmn_list
+        if p.name not in constants.RESTRICTED_POKEMON and not p.revealed
+    ] or [p for p in pkmn_list if not p.revealed]
+    return random.choice(pkmn_to_sample_from)
+
+
+def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, float)]:
+    battle = deepcopy(battle)
+    if battle.team_preview:
+        num_reserves = NUM_RESERVES + 2
+    else:
+        num_reserves = NUM_RESERVES
+
+    battles = []
+    for i in range(num_teams):
+        battle_copy = deepcopy(battle)
+        while len(battle_copy.opponent.reserve) > num_reserves:
+            pkmn = sample_pkmn_to_remove(battle_copy.opponent.reserve)
+            battle_copy.opponent.reserve.remove(pkmn)
+
+        if battle_copy.team_preview:
+            team_preview_shuffle(battle_copy)
+
+        assert len(battle_copy.opponent.reserve) == 2
+        populate_spreads(battle_copy, i)
+        battles.append((battle_copy, 1 / num_teams))
+
+    return battles
+
+
+def populate_spreads(battle: Battle, index: int):
+    logger.info("Battle {}".format(index))
+    for pkmn in [
+        battle.opponent.slot_a.active,
+        battle.opponent.slot_b.active,
+    ] + battle.opponent.reserve:
+        if pkmn.hp <= 0:
+            continue
+
+        pkmn_spread = SmogonSets.get_random_spread(pkmn)
+        if pkmn_spread is None:
+            logger.warning("\tNo spread found for {}".format(pkmn.name))
+        else:
+            pkmn.set_spread(pkmn_spread.nature, pkmn_spread.evs)
+            logger.info(
+                "\tPredicted Set: {} {} for {}".format(
+                    pkmn_spread.nature.ljust(7), str(pkmn.evs).ljust(25), pkmn.name
+                )
+            )
 
 
 def select_move_from_mcts_results(mcts_results: list[(MctsResult, float, int)]) -> str:
@@ -57,70 +124,12 @@ class BattleBot(Battle):
     def __init__(self, *args, **kwargs):
         super(BattleBot, self).__init__(*args, **kwargs)
 
-    def _search_time_num_battles_randombattles(self):
-        revealed_pkmn = len(self.opponent.reserve)
-        if self.opponent.active is not None:
-            revealed_pkmn += 1
-
-        opponent_active_num_moves = len(self.opponent.active.moves)
-        in_time_pressure = self.time_remaining is not None and self.time_remaining <= 60
-
-        # it is still quite early in the battle and the pkmn in front of us
-        # hasn't revealed any moves: search a lot of battles shallowly
-        if (
-            revealed_pkmn <= 3
-            and self.opponent.active.hp > 0
-            and opponent_active_num_moves == 0
-        ):
-            num_battles_multiplier = 2 if in_time_pressure else 4
-            return FoulPlayConfig.parallelism * num_battles_multiplier, int(
-                FoulPlayConfig.search_time_ms // 2
-            )
-
-        else:
-            num_battles_multiplier = 1 if in_time_pressure else 2
-            return FoulPlayConfig.parallelism * num_battles_multiplier, int(
-                FoulPlayConfig.search_time_ms
-            )
-
-    def _search_time_num_battles_standard_battle(self):
-        opponent_active_num_moves = len(self.opponent.active.moves)
-        in_time_pressure = self.time_remaining is not None and self.time_remaining <= 60
-
-        if (
-            self.team_preview
-            or (self.opponent.active.hp > 0 and opponent_active_num_moves == 0)
-            or opponent_active_num_moves < 3
-        ):
-            num_battles_multiplier = 1 if in_time_pressure else 2
-            return FoulPlayConfig.parallelism * num_battles_multiplier, int(
-                FoulPlayConfig.search_time_ms
-            )
-        else:
-            return FoulPlayConfig.parallelism, FoulPlayConfig.search_time_ms
-
     def find_best_move(self):
-        if self.team_preview:
-            self.user.active = self.user.reserve.pop(0)
-            self.opponent.active = self.opponent.reserve.pop(0)
+        num_teams = 8 if self.team_preview else 4
+        battles = sample_unrevealed_pkmn(self, num_teams)
 
-        if self.battle_type == constants.RANDOM_BATTLE:
-            num_battles, search_time_per_battle = (
-                self._search_time_num_battles_randombattles()
-            )
-            battles = prepare_random_battles(self, num_battles)
-        elif self.battle_type == constants.BATTLE_FACTORY:
-            num_battles, search_time_per_battle = (
-                self._search_time_num_battles_standard_battle()
-            )
-            battles = prepare_random_battles(self, num_battles)
-        elif self.battle_type == constants.STANDARD_BATTLE:
-            num_battles, search_time_per_battle = (
-                self._search_time_num_battles_standard_battle()
-            )
-            battles = prepare_battles(self, num_battles)
-        else:
-            raise ValueError("Unsupported battle type: {}".format(self.battle_type))
+        num_battles = len(battles)
+        search_time_per_battle = FoulPlayConfig.search_time_ms
 
         logger.info("Searching for a move using MCTS...")
         logger.info(
@@ -128,27 +137,20 @@ class BattleBot(Battle):
                 num_battles, search_time_per_battle
             )
         )
-        with ProcessPoolExecutor(max_workers=FoulPlayConfig.parallelism) as executor:
-            futures = []
-            for index, (b, chance) in enumerate(battles):
-                fut = executor.submit(
-                    get_result_from_mcts,
-                    battle_to_poke_engine_state(b),
-                    search_time_per_battle,
+
+        mcts_results = []
+        for index, (b, chance) in enumerate(battles):
+            mcts_results.append(
+                (
+                    get_result_from_mcts(
+                        battle_to_poke_engine_state(b), search_time_per_battle, index
+                    ),
+                    chance,
                     index,
                 )
-                futures.append((fut, chance, index))
+            )
 
-        mcts_results = [
-            (fut.result(), chance, index) for (fut, chance, index) in futures
-        ]
         choice = select_move_from_mcts_results(mcts_results)
         logger.info("Choice: {}".format(choice))
-
-        if self.team_preview:
-            self.user.reserve.insert(0, self.user.active)
-            self.user.active = None
-            self.opponent.reserve.insert(0, self.opponent.active)
-            self.opponent.active = None
 
         return choice

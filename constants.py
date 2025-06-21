@@ -9,6 +9,46 @@ RANDOM_BATTLE = "random_battle"
 
 NO_TEAM_PREVIEW_GENS = {"gen1", "gen2", "gen3", "gen4"}
 
+RESTRICTED_POKEMON = {
+    "mewtwo",
+    "lugia",
+    "hooh",
+    "kyogre",
+    "groudon",
+    "rayquaza",
+    "dialga",
+    "dialgaorigin",
+    "palkia",
+    "palkiaorigin",
+    "giratina",
+    "giratinaorigin",
+    "reshiram",
+    "zekrom",
+    "kyurem",
+    "kyuremwhite",
+    "kyuremblack",
+    "cosmog",
+    "cosmoem",
+    "solgaleo",
+    "lunala",
+    "necrozma",
+    "necrozmaduskmane",
+    "necrozmadawnwings",
+    "zacian",
+    "zaciancrowned",
+    "zamazenta",
+    "zamazentacrowned",
+    "eternatus",
+    "calyrex",
+    "calyrexice",
+    "calyrexshadow",
+    "miraidon",
+    "koraidon",
+    "terapagos",
+    "terapagosterastal",
+    "terapagosstellar",
+}
+
 START_STRING = "|start"
 RQID = "rqid"
 TEAM_PREVIEW_POKE = "poke"

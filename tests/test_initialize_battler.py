@@ -7,7 +7,7 @@ from fp.battle import Pokemon
 
 class TestUpdateFromRequestJson(unittest.TestCase):
     def setUp(self):
-        self.battler = Battler()
+        self.battler = Battler("1")
 
     def test_basic_updating_attributes_for_active_pkmn(self):
         request_dict = {

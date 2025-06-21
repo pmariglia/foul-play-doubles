@@ -2,18 +2,18 @@ import logging
 
 import constants
 from data import pokedex
-from fp.battle import Battle, Pokemon, Battler, LastUsedMove
+from fp.battle import Battle, Pokemon, Battler, Slot, LastUsedMove
 
 from poke_engine import (
     State as PokeEngineState,
     Side as PokeEngineSide,
+    SideSlot as PokeEngineSideSlot,
     SideConditions as PokeEngineSideConditions,
     VolatileStatusDurations as PokeEngineVolatileStatusDurations,
     Pokemon as PokeEnginePokemon,
     Move as PokeEngineMove,
     monte_carlo_tree_search,
     calculate_damage,
-    iterative_deepening_expectiminimax,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,17 +98,20 @@ def get_dummy_poke_engine_pkmn():
     return PokeEnginePokemon(id="pikachu", level=1, hp=0)
 
 
-def battler_to_poke_engine_side(
-    battler: Battler, force_switch=False, stayed_in_on_switchout_move=False
-):
-    num_reserves = len(battler.reserve)
+def slot_to_poke_engine_slot(
+    side: Battler,
+    slot: Slot,
+    active_index: str,
+    force_switch=False,
+    stayed_in_on_switchout_move=False,
+) -> PokeEngineSideSlot:
     last_used_move = "move:none"
-    if battler.last_used_move.move.startswith("switch "):
+    if slot.last_used_move.move.startswith("switch "):
         last_used_move = "switch:0"
-    elif battler.last_used_move.move:
-        pkmn_moves = [m.name for m in battler.active.moves]
+    elif slot.last_used_move.move:
+        pkmn_moves = [m.name for m in slot.active.moves]
         for i, move in enumerate(pkmn_moves):
-            if move == battler.last_used_move.move:
+            if move == slot.last_used_move.move:
                 last_used_move = "move:{}".format(i)
                 break
         else:
@@ -117,37 +120,89 @@ def battler_to_poke_engine_side(
     # substitute health can't be known with certainty but the client can keep track of if the substitute was hit
     # to approximate: the substitute health is 1/10 of the pokemon's max_hp if it was hit, 1/4 if it wasn't
     substitute_health = 0
-    if constants.SUBSTITUTE in battler.active.volatile_statuses:
-        if battler.active.substitute_hit:
-            substitute_health = int(battler.active.max_hp / 10)
+    if constants.SUBSTITUTE in slot.active.volatile_statuses:
+        if slot.active.substitute_hit:
+            substitute_health = int(slot.active.max_hp / 10)
         else:
-            substitute_health = int(battler.active.max_hp / 4)
+            substitute_health = int(slot.active.max_hp / 4)
 
     future_sight_index = 0
-    if battler.future_sight[0] > 0:
-        if battler.active.name == battler.future_sight[1]:
+    if slot.future_sight[0] > 0:
+        if slot.active.name == slot.future_sight[1]:
             future_sight_index = 0
         else:
             index = 1
-            for pkmn in battler.reserve:
-                if pkmn.name == battler.future_sight[1]:
+            for pkmn in side.reserve:
+                if pkmn.name == slot.future_sight[1]:
                     future_sight_index = index
                     break
                 index += 1
             else:
                 raise ValueError(
                     "Couldnt find future sight source: {} not in {} + {}".format(
-                        battler.future_sight[1],
-                        battler.active.name,
-                        [p.name for p in battler.reserve],
+                        slot.future_sight[1],
+                        slot.active.name,
+                        [p.name for p in side.reserve],
                     )
                 )
 
+    return PokeEngineSideSlot(
+        active_index=active_index,
+        baton_passing=slot.baton_passing,
+        shed_tailing=slot.shed_tailing,
+        wish=(int(slot.wish[0]), int(slot.wish[1])),
+        future_sight=(slot.future_sight[0], str(future_sight_index)),
+        force_switch=force_switch,
+        force_trapped=slot.trapped,
+        slow_uturn_move=stayed_in_on_switchout_move,
+        volatile_statuses=slot.active.volatile_statuses,
+        volatile_status_durations=PokeEngineVolatileStatusDurations(
+            confusion=slot.active.volatile_status_durations[constants.CONFUSION],
+            lockedmove=slot.active.volatile_status_durations[constants.LOCKED_MOVE],
+            protect=slot.active.volatile_status_durations[constants.PROTECT],
+            encore=slot.active.volatile_status_durations["encore"],
+            slowstart=slot.active.volatile_status_durations[constants.SLOW_START],
+            taunt=slot.active.volatile_status_durations[constants.TAUNT],
+            yawn=slot.active.volatile_status_durations[constants.YAWN],
+        ),
+        substitute_health=substitute_health,
+        attack_boost=slot.active.boosts[constants.ATTACK],
+        defense_boost=slot.active.boosts[constants.DEFENSE],
+        special_attack_boost=slot.active.boosts[constants.SPECIAL_ATTACK],
+        special_defense_boost=slot.active.boosts[constants.SPECIAL_DEFENSE],
+        speed_boost=slot.active.boosts[constants.SPEED],
+        accuracy_boost=0,
+        evasion_boost=0,
+        last_used_move=last_used_move,
+        switch_out_move_second_saved_move="NONE",  # always none because we can't know this
+    )
+
+
+def battler_to_poke_engine_side(
+    battler: Battler,
+    force_switch=(False, False),
+    slot_a_stayed_in_on_pivot=False,
+    slot_b_stayed_in_on_pivot=False,
+):
     side = PokeEngineSide(
-        active_index="0",
-        baton_passing=battler.baton_passing,
-        shed_tailing=battler.shed_tailing,
-        pokemon=[pokemon_to_poke_engine_pkmn(battler.active)]
+        slot_a=slot_to_poke_engine_slot(
+            battler,
+            battler.slot_a,
+            active_index="0",
+            force_switch=force_switch[0],
+            stayed_in_on_switchout_move=slot_a_stayed_in_on_pivot,
+        ),
+        slot_b=slot_to_poke_engine_slot(
+            battler,
+            battler.slot_b,
+            active_index="1",
+            force_switch=force_switch[1],
+            stayed_in_on_switchout_move=slot_b_stayed_in_on_pivot,
+        ),
+        pokemon=[
+            pokemon_to_poke_engine_pkmn(battler.slot_a.active),
+            pokemon_to_poke_engine_pkmn(battler.slot_b.active),
+        ]
         + [pokemon_to_poke_engine_pkmn(p) for p in battler.reserve],
         side_conditions=PokeEngineSideConditions(
             aurora_veil=battler.side_conditions[constants.AURORA_VEIL],
@@ -170,35 +225,7 @@ def battler_to_poke_engine_side(
             toxic_spikes=battler.side_conditions[constants.TOXIC_SPIKES],
             wide_guard=battler.side_conditions["wideguard"],
         ),
-        wish=(int(battler.wish[0]), int(battler.wish[1])),
-        future_sight=(battler.future_sight[0], str(future_sight_index)),
-        force_switch=force_switch,
-        force_trapped=battler.trapped,
-        slow_uturn_move=stayed_in_on_switchout_move,
-        volatile_statuses=battler.active.volatile_statuses,
-        volatile_status_durations=PokeEngineVolatileStatusDurations(
-            confusion=battler.active.volatile_status_durations[constants.CONFUSION],
-            lockedmove=battler.active.volatile_status_durations[constants.LOCKED_MOVE],
-            encore=battler.active.volatile_status_durations["encore"],
-            slowstart=battler.active.volatile_status_durations[constants.SLOW_START],
-            taunt=battler.active.volatile_status_durations[constants.TAUNT],
-            yawn=battler.active.volatile_status_durations[constants.YAWN],
-        ),
-        substitute_health=substitute_health,
-        attack_boost=battler.active.boosts[constants.ATTACK],
-        defense_boost=battler.active.boosts[constants.DEFENSE],
-        special_attack_boost=battler.active.boosts[constants.SPECIAL_ATTACK],
-        special_defense_boost=battler.active.boosts[constants.SPECIAL_DEFENSE],
-        speed_boost=battler.active.boosts[constants.SPEED],
-        accuracy_boost=0,
-        evasion_boost=0,
-        last_used_move=last_used_move,
-        switch_out_move_second_saved_move="NONE",  # always none because we can't know this
     )
-
-    while num_reserves < 5:
-        side.pokemon.append(get_dummy_poke_engine_pkmn())
-        num_reserves += 1
 
     return side
 
@@ -261,53 +288,73 @@ def replace_hidden_power_last_used_move(battler: Battler):
         )
 
 
-def replace_return_last_used_move(battler: Battler):
-    for mv in battler.active.moves:
+def replace_return_last_used_move(slot: Slot):
+    for mv in slot.active.moves:
         if mv.name.startswith("return"):
-            battler.last_used_move = LastUsedMove(
-                pokemon_name=battler.last_used_move.pokemon_name,
+            slot.last_used_move = LastUsedMove(
+                pokemon_name=slot.last_used_move.pokemon_name,
                 move=mv.name,
-                turn=battler.last_used_move.turn,
+                turn=slot.last_used_move.turn,
             )
             break
     else:
         logger.warning("Could not replace return")
-        battler.last_used_move = LastUsedMove(
-            pokemon_name=battler.last_used_move.pokemon_name,
-            move="switch {}".format(battler.active.name),
-            turn=battler.last_used_move.turn,
+        slot.last_used_move = LastUsedMove(
+            pokemon_name=slot.last_used_move.pokemon_name,
+            move="switch {}".format(slot.active.name),
+            turn=slot.last_used_move.turn,
         )
 
 
-def battle_to_poke_engine_state(battle: Battle, swap=False):
+def battle_to_poke_engine_state(battle: Battle):
     # Boolean that represents if we have used a switch-out move first (i.e. fast uturn)
     # this is toggled to True if we did, and signifies to the engine that the opponent has
     # selected a move and that should be accounted for in the search
-    opponent_switchout_move_stayed_in = False
-    bot_lum = battle.user.last_used_move
-    opp_lum = battle.opponent.last_used_move
-    if bot_lum.move in constants.SWITCH_OUT_MOVES and opp_lum.turn != bot_lum.turn:
-        opponent_switchout_move_stayed_in = True
+    opponent_a_stayed_in_on_pivot = False
+    opponent_b_stayed_in_on_pivot = False
+    bot_a_lum = battle.user.slot_a.last_used_move
+    bot_b_lum = battle.user.slot_b.last_used_move
+    opp_a_lum = battle.opponent.slot_a.last_used_move
+    opp_b_lum = battle.opponent.slot_b.last_used_move
+    if (
+        bot_a_lum.move in constants.SWITCH_OUT_MOVES
+        and opp_a_lum.turn != bot_a_lum.turn
+    ):
+        opponent_a_stayed_in_on_pivot = True
+    if (
+        bot_a_lum.move in constants.SWITCH_OUT_MOVES
+        and opp_b_lum.turn != bot_a_lum.turn
+    ):
+        opponent_b_stayed_in_on_pivot = True
+    if (
+        bot_b_lum.move in constants.SWITCH_OUT_MOVES
+        and opp_a_lum.turn != bot_a_lum.turn
+    ):
+        opponent_a_stayed_in_on_pivot = True
+    if (
+        bot_b_lum.move in constants.SWITCH_OUT_MOVES
+        and opp_b_lum.turn != bot_a_lum.turn
+    ):
+        opponent_b_stayed_in_on_pivot = True
 
-    if battle.opponent.last_used_move.move == constants.HIDDEN_POWER:
-        replace_hidden_power_last_used_move(battle.opponent)
-    elif battle.opponent.last_used_move.move == "return":
-        replace_return_last_used_move(battle.opponent)
+    if battle.user.slot_a.last_used_move.move == "return":
+        replace_return_last_used_move(battle.user.slot_a)
+    if battle.user.slot_b.last_used_move.move == "return":
+        replace_return_last_used_move(battle.user.slot_b)
 
-    if battle.user.last_used_move.move == constants.HIDDEN_POWER:
-        replace_hidden_power_last_used_move(battle.user)
-    if battle.user.last_used_move.move == "return":
-        replace_return_last_used_move(battle.user)
+    if battle.opponent.slot_a.last_used_move.move == "return":
+        replace_return_last_used_move(battle.opponent.slot_a)
+    if battle.opponent.slot_b.last_used_move.move == "return":
+        replace_return_last_used_move(battle.opponent.slot_b)
 
     side_one = battler_to_poke_engine_side(
         battle.user, force_switch=battle.force_switch
     )
     side_two = battler_to_poke_engine_side(
-        battle.opponent, stayed_in_on_switchout_move=opponent_switchout_move_stayed_in
+        battle.opponent,
+        slot_a_stayed_in_on_pivot=opponent_a_stayed_in_on_pivot,
+        slot_b_stayed_in_on_pivot=opponent_b_stayed_in_on_pivot,
     )
-
-    if swap:
-        side_one, side_two = side_two, side_one
 
     state = PokeEngineState(
         side_one=side_one,
@@ -325,7 +372,13 @@ def battle_to_poke_engine_state(battle: Battle, swap=False):
 
 
 def poke_engine_get_damage_rolls(
-    battle: Battle, side_one_move, side_two_move, side_one_went_first
+    battle: Battle,
+    attacker_side_str: str,
+    attacker_slot_str: str,
+    target_side_str: str,
+    target_slot_str: str,
+    side_one_move: str,
+    side_two_move: str,
 ):
     if side_one_move.startswith("switch"):
         side_one_move = "switch"
@@ -335,29 +388,34 @@ def poke_engine_get_damage_rolls(
     state = battle_to_poke_engine_state(battle)
 
     logger.debug(
-        "Calling calculate damage with state: {}, m1: {}, m2: {}, s1_went_first: {}".format(
+        "Calling calculate damage with state: {}, attacker_side: {}, attacker_slot: {}, target_side: {}, target_slot: {}, s1_move: {}, s2_move: {}".format(
             state.to_string(),
+            attacker_side_str,
+            attacker_slot_str,
+            target_side_str,
+            target_slot_str,
             side_one_move,
             side_two_move,
-            side_one_went_first,
         )
     )
 
-    s1_rolls, s2_rolls = calculate_damage(
+    rolls = calculate_damage(
         state,
+        attacker_side_str,
+        attacker_slot_str,
+        target_side_str,
+        target_slot_str,
         side_one_move,
         side_two_move,
-        side_one_went_first,
     )
 
     logger.debug(
-        "Got Rolls s1_rolls: {}, s2_rolls: {}".format(
-            s1_rolls,
-            s2_rolls,
+        "Got Rolls rolls: {}".format(
+            rolls,
         )
     )
 
-    return s1_rolls, s2_rolls
+    return rolls
 
 
 def get_payoff_matrix_from_mcts(
