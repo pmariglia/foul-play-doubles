@@ -183,6 +183,7 @@ class _SmogonSets:
         self.all_pkmn_counts.clear()
 
         final_infos = {}
+        final_effectiveness = {}
         for pkmn_name, pkmn_information in infos.items():
             normalized_name = normalize_name(pkmn_name)
             self.all_pkmn_counts[normalized_name] = {}
@@ -208,7 +209,6 @@ class _SmogonSets:
                 )
 
             spreads = []
-            matchup_effectiveness = {}
             total_count = pkmn_information["Raw count"]
             final_infos[normalized_name] = {}
 
@@ -217,8 +217,10 @@ class _SmogonSets:
             ].items():
                 counter_name = normalize_name(counter_name)
                 if counter_name in pkmn_names:
-                    matchup_effectiveness[counter_name] = round(
-                        1 - counter_information[1], 2
+                    if counter_name not in final_effectiveness:
+                        final_effectiveness[counter_name] = {}
+                    final_effectiveness[counter_name][normalize_name(pkmn_name)] = (
+                        round(counter_information[1], 2)
                     )
 
             for spread, count in sorted(
@@ -235,10 +237,12 @@ class _SmogonSets:
                     else:
                         spreads.append([nature, evs, percentage])
 
-            final_infos[normalized_name][EFFECTIVENESS] = matchup_effectiveness
             final_infos[normalized_name][SPREADS_STRING] = sorted(
                 spreads, key=lambda x: x[2], reverse=True
             )[:100]
+
+        for k, v in final_infos.items():
+            v[EFFECTIVENESS] = final_effectiveness.get(k, {})
 
         return final_infos
 
