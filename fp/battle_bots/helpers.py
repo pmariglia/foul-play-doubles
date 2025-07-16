@@ -52,9 +52,17 @@ def format_decision(battle, slot, decision):
                 logger.info("Skipping target because {} was charging".format(decision))
                 decision = "1"
             elif decision == "terastarstorm" and slot.active.terastallized:
-                logger.info("Skipping target because terastarstorm is being used while terastallized".format(decision))
+                logger.info(
+                    "Skipping target because terastarstorm is being used while terastallized".format(
+                        decision
+                    )
+                )
             elif decision == "outrage":
-                logger.info("Skipping target because outrage is a random target".format(decision))
+                logger.info(
+                    "Skipping target because outrage is a random target".format(
+                        decision
+                    )
+                )
             else:
                 decision = f"{decision} {target}"
 
