@@ -1,9 +1,6 @@
-import dataclasses
 from collections import defaultdict
 from collections import namedtuple
 from dataclasses import dataclass
-from abc import ABC
-from abc import abstractmethod
 
 import constants
 import logging
@@ -55,7 +52,7 @@ boost_multiplier_lookup = {
 }
 
 
-class Battle(ABC):
+class Battle:
     def __init__(self, battle_tag):
         self.battle_tag = battle_tag
         self.user = Battler("1")
@@ -171,8 +168,8 @@ class Battle(ABC):
             )
         )
 
-    @abstractmethod
-    def find_best_move(self): ...
+    def find_best_move(self):
+        raise NotImplementedError("find_best_move must be implemented in subclasses")
 
 
 class Slot:
@@ -584,7 +581,7 @@ class Battler:
 
 
 class Pokemon:
-    def __init__(self, name: str, level: int, nature="serious", evs=(85,) * 6):
+    def __init__(self, name: str, level: int, nature="serious", evs=(85,) * 6, ivs=(31,) * 6):
         self.name = normalize_name(name)
         self.nickname = None
         self.base_name = self.name
@@ -604,7 +601,7 @@ class Pokemon:
             self.base_stats = pokedex[self.name][constants.BASESTATS]
 
         self.stats = calculate_stats(
-            self.base_stats, self.level, nature=nature, evs=evs
+            self.base_stats, self.level, nature=nature, evs=evs, ivs=ivs
         )
 
         self.max_hp = self.stats.pop(constants.HITPOINTS)
@@ -647,6 +644,35 @@ class Pokemon:
         self.gen_3_consecutive_sleep_talks = 0
         self.impossible_items = set()
         self.impossible_abilities = set()
+
+    @classmethod
+    def from_dict(cls, pkmn_dict: dict, level=50):
+        evs = []
+        for ev in pkmn_dict["evs"].values():
+            if ev:
+                evs.append(int(ev))
+            else:
+                evs.append(0)
+        ivs = []
+        for iv in pkmn_dict["ivs"].values():
+            if iv:
+                ivs.append(int(iv))
+            else:
+                ivs.append(31)
+        pkmn = cls(
+            normalize_name(pkmn_dict["species"]),
+            level,
+            nature=pkmn_dict["nature"],
+            evs=tuple(evs),
+            ivs=tuple(ivs),
+        )
+        pkmn.ability = pkmn_dict[constants.ABILITY]
+        pkmn.item = pkmn_dict[constants.ITEM]
+        pkmn.tera_type = pkmn_dict["tera_type"]
+        for move in pkmn_dict[constants.MOVES]:
+            pkmn.add_move(move)
+        return pkmn
+
 
     def has_type(self, pkmn_type: str):
         if self.terastallized:
