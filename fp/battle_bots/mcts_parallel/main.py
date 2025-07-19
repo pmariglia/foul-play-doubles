@@ -1,5 +1,6 @@
 import logging
 import random
+from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 
 from poke_engine import MctsResult
@@ -138,17 +139,20 @@ class BattleBot(Battle):
             )
         )
 
-        mcts_results = []
-        for index, (b, chance) in enumerate(battles):
-            mcts_results.append(
-                (
-                    get_result_from_mcts(
-                        battle_to_poke_engine_state(b), search_time_per_battle, index
-                    ),
-                    chance,
+        with ProcessPoolExecutor(max_workers=FoulPlayConfig.parallelism) as executor:
+            futures = []
+            for index, (b, chance) in enumerate(battles):
+                fut = executor.submit(
+                    get_result_from_mcts,
+                    battle_to_poke_engine_state(b),
+                    search_time_per_battle,
                     index,
                 )
-            )
+                futures.append((fut, chance, index))
+
+        mcts_results = [
+            (fut.result(), chance, index) for (fut, chance, index) in futures
+        ]
 
         choice = select_move_from_mcts_results(mcts_results)
         logger.info("Choice: {}".format(choice))

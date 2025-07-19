@@ -19,7 +19,7 @@ from typing import Optional
 
 import constants
 from data import all_move_json, pokedex
-from fp.helpers import calculate_stats
+from fp.helpers import calculate_stats, natures
 from fp.helpers import normalize_name
 
 PWD = os.path.dirname(os.path.abspath(__file__))
@@ -113,6 +113,24 @@ class PokemonSpread:
     count: int
 
     def spread_makes_sense(self, pkmn: Pokemon):
+        if self.evs[3] > 50 or natures[self.nature]["plus"] == constants.SPECIAL_ATTACK:
+            has_special_move = any(
+                all_move_json.get(mv, {}).get(constants.CATEGORY, "")
+                == constants.SPECIAL
+                for mv in pkmn.moves
+            )
+            if not has_special_move:
+                return False
+
+        if self.evs[1] > 50 or natures[self.nature]["plus"] == constants.ATTACK:
+            has_physical_move = any(
+                all_move_json.get(mv, {}).get(constants.CATEGORY, "")
+                == constants.PHYSICAL
+                for mv in pkmn.moves
+            )
+            if not has_physical_move:
+                return False
+
         stats = calculate_stats(
             pkmn.base_stats,
             pkmn.level,
