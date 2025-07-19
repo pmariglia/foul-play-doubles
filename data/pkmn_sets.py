@@ -115,7 +115,7 @@ class PokemonSpread:
     def spread_makes_sense(self, pkmn: Pokemon):
         if self.evs[3] > 50 or natures[self.nature]["plus"] == constants.SPECIAL_ATTACK:
             has_special_move = any(
-                all_move_json.get(mv, {}).get(constants.CATEGORY, "")
+                all_move_json.get(mv.name, {}).get(constants.CATEGORY, "")
                 == constants.SPECIAL
                 for mv in pkmn.moves
             )
@@ -124,7 +124,7 @@ class PokemonSpread:
 
         if self.evs[1] > 50 or natures[self.nature]["plus"] == constants.ATTACK:
             has_physical_move = any(
-                all_move_json.get(mv, {}).get(constants.CATEGORY, "")
+                all_move_json.get(mv.name, {}).get(constants.CATEGORY, "")
                 == constants.PHYSICAL
                 for mv in pkmn.moves
             )
