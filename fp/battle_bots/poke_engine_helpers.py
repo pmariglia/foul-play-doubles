@@ -446,14 +446,3 @@ def get_payoff_matrix_from_mcts(
         win_percentage,
         iterations,
     )
-
-
-def get_payoff_matrix_with_minimax(
-    poke_engine_state: PokeEngineState, search_time_ms: int
-):
-    state_string = poke_engine_state.to_string()
-    logger.debug("Calling with state: {}".format(state_string))
-
-    id_result = iterative_deepening_expectiminimax(poke_engine_state, search_time_ms)
-
-    return id_result.get_safest_move()
