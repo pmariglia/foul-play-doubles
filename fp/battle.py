@@ -581,7 +581,9 @@ class Battler:
 
 
 class Pokemon:
-    def __init__(self, name: str, level: int, nature="serious", evs=(85,) * 6, ivs=(31,) * 6):
+    def __init__(
+        self, name: str, level: int, nature="serious", evs=(85,) * 6, ivs=(31,) * 6
+    ):
         self.name = normalize_name(name)
         self.nickname = None
         self.base_name = self.name
@@ -672,7 +674,6 @@ class Pokemon:
         for move in pkmn_dict[constants.MOVES]:
             pkmn.add_move(move)
         return pkmn
-
 
     def has_type(self, pkmn_type: str):
         if self.terastallized:

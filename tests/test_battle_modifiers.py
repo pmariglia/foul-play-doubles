@@ -1,6 +1,5 @@
 import unittest
 import json
-from collections import defaultdict
 
 import constants
 from fp.helpers import calculate_stats
@@ -15,15 +14,11 @@ from fp.battle_modifier import (
     request,
     fieldstart,
     fieldend,
-    illusion_end,
     drag,
-    switch,
     clearboost,
     remove_item,
-    set_item,
     sidestart,
 )
-from fp.battle_modifier import fail
 from fp.battle_modifier import terastallize
 from fp.battle_modifier import activate
 from fp.battle_modifier import prepare
@@ -43,14 +38,9 @@ from fp.battle_modifier import start_volatile_status
 from fp.battle_modifier import end_volatile_status
 from fp.battle_modifier import update_ability
 from fp.battle_modifier import form_change
-from fp.battle_modifier import zpower
 from fp.battle_modifier import clearnegativeboost
 from fp.battle_modifier import check_speed_ranges
-from fp.battle_modifier import check_choicescarf
-from fp.battle_modifier import check_heavydutyboots
-from fp.battle_modifier import get_damage_dealt
 from fp.battle_modifier import singleturn
-from fp.battle_modifier import transform
 from fp.battle_modifier import process_battle_updates
 from fp.battle_modifier import upkeep
 from fp.battle_modifier import inactive
@@ -63,7 +53,7 @@ Battle.__abstractmethods__ = set()
 class TestRequestMessage(unittest.TestCase):
     def setUp(self):
         self.battle = Battle(None)
-        self.battle.user.active = Pokemon("pikachu", 100)
+        self.battle.user.slot_a.active = Pokemon("pikachu", 100)
         self.request_json = {
             "active": [
                 {
@@ -228,25 +218,25 @@ class TestRequestMessage(unittest.TestCase):
     def test_request_sets_force_switch_to_false(self):
         split_request_message = ["", "request", json.dumps(self.request_json)]
         request(self.battle, split_request_message)
-        self.assertEqual(False, self.battle.force_switch)
+        self.assertEqual((False, False), self.battle.force_switch)
 
     def test_force_switch_properly_sets_the_force_switch_flag(self):
         self.request_json.pop("active")
-        self.request_json[constants.FORCE_SWITCH] = [True]
+        self.request_json[constants.FORCE_SWITCH] = [True, True]
         split_request_message = ["", "request", json.dumps(self.request_json)]
         request(self.battle, split_request_message)
-        self.assertEqual(True, self.battle.force_switch)
+        self.assertEqual((True, True), self.battle.force_switch)
 
     def test_wait_properly_sets_wait_flag(self):
         self.request_json.pop("active")
-        self.request_json[constants.WAIT] = [True]
+        self.request_json[constants.WAIT] = [True, True]
         split_request_message = ["", "request", json.dumps(self.request_json)]
         request(self.battle, split_request_message)
         self.assertEqual(True, self.battle.wait)
 
     def test_wait_does_not_initialize_pokemon(self):
         self.request_json.pop("active")
-        self.request_json[constants.WAIT] = [True]
+        self.request_json[constants.WAIT] = [True, True]
         split_request_message = ["", "request", json.dumps(self.request_json)]
         request(self.battle, split_request_message)
         self.assertEqual(0, len(self.battle.user.reserve))
@@ -262,15 +252,6 @@ class TestSwitchOrDrag(unittest.TestCase):
         self.opponent_active = Pokemon("caterpie", 100)
         self.battle.opponent.slot_a.active = self.opponent_active
         self.battle.opponent.reserve = []
-
-    def test_adds_intimidate_to_impossible_abilities_when_switching_in(self):
-        split_msg = ["", "switch", "p2a: caterpie", "Caterpie, L100, M", "100/100"]
-        switch_or_drag(self.battle, split_msg)
-
-        self.assertEqual("caterpie", self.battle.opponent.slot_a.active.name)
-        self.assertIn(
-            "intimidate", self.battle.opponent.slot_a.active.impossible_abilities
-        )
 
     def test_does_not_add_sandstream_to_impossible_abilities_if_sand_active(self):
         split_msg = ["", "switch", "p2a: caterpie", "Caterpie, L100, M", "100/100"]
@@ -313,17 +294,6 @@ class TestSwitchOrDrag(unittest.TestCase):
         self.assertNotIn(
             "intimidate", self.battle.opponent.slot_a.active.impossible_abilities
         )
-
-    def test_adds_impossible_items_when_switching_in(self):
-        split_msg = ["", "switch", "p2a: caterpie", "Caterpie, L100, M", "100/100"]
-
-        for item in ITEMS_REVEALED_ON_SWITCH_IN:
-            self.assertNotIn(item, self.battle.opponent.slot_a.active.impossible_items)
-
-        switch_or_drag(self.battle, split_msg)
-
-        for item in ITEMS_REVEALED_ON_SWITCH_IN:
-            self.assertIn(item, self.battle.opponent.slot_a.active.impossible_items)
 
     def test_cramorantgulping_reverts_to_cramorant_in_switchout(self):
         self.battle.opponent.slot_a.active.name = "cramorantgulping"
@@ -1126,32 +1096,50 @@ class TestClearAllBoosts(unittest.TestCase):
         self.opponent_active.max_hp = 200
         self.opponent_active.hp = 200
 
-        self.battle.opponent.active = self.opponent_active
-        self.battle.user.active = self.user_active
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_b.active = Pokemon("pikachu", 100)
+        self.battle.user.slot_a.active = self.user_active
+        self.battle.user.slot_b.active = Pokemon("pikachu", 100)
 
     def test_clears_bots_boosts(self):
         split_msg = ["", "-clearallboost"]
-        self.battle.user.active.boosts = {constants.ATTACK: 1, constants.DEFENSE: 1}
+        self.battle.user.slot_a.active.boosts = {
+            constants.ATTACK: 1,
+            constants.DEFENSE: 1,
+        }
         clearallboost(self.battle, split_msg)
-        self.assertEqual(0, self.battle.user.active.boosts[constants.ATTACK])
-        self.assertEqual(0, self.battle.user.active.boosts[constants.DEFENSE])
+        self.assertEqual(0, self.battle.user.slot_a.active.boosts[constants.ATTACK])
+        self.assertEqual(0, self.battle.user.slot_a.active.boosts[constants.DEFENSE])
 
     def test_clears_opponents_boosts(self):
         split_msg = ["", "-clearallboost"]
-        self.battle.opponent.active.boosts = {constants.ATTACK: 1, constants.DEFENSE: 1}
+        self.battle.opponent.slot_a.active.boosts = {
+            constants.ATTACK: 1,
+            constants.DEFENSE: 1,
+        }
         clearallboost(self.battle, split_msg)
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.ATTACK])
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.DEFENSE])
+        self.assertEqual(0, self.battle.opponent.slot_a.active.boosts[constants.ATTACK])
+        self.assertEqual(
+            0, self.battle.opponent.slot_a.active.boosts[constants.DEFENSE]
+        )
 
     def test_clears_opponents_and_botsboosts(self):
         split_msg = ["", "-clearallboost"]
-        self.battle.user.active.boosts = {constants.ATTACK: 1, constants.DEFENSE: 1}
-        self.battle.opponent.active.boosts = {constants.ATTACK: 1, constants.DEFENSE: 1}
+        self.battle.user.slot_a.active.boosts = {
+            constants.ATTACK: 1,
+            constants.DEFENSE: 1,
+        }
+        self.battle.opponent.slot_a.active.boosts = {
+            constants.ATTACK: 1,
+            constants.DEFENSE: 1,
+        }
         clearallboost(self.battle, split_msg)
-        self.assertEqual(0, self.battle.user.active.boosts[constants.ATTACK])
-        self.assertEqual(0, self.battle.user.active.boosts[constants.DEFENSE])
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.ATTACK])
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.DEFENSE])
+        self.assertEqual(0, self.battle.user.slot_a.active.boosts[constants.ATTACK])
+        self.assertEqual(0, self.battle.user.slot_a.active.boosts[constants.DEFENSE])
+        self.assertEqual(0, self.battle.opponent.slot_a.active.boosts[constants.ATTACK])
+        self.assertEqual(
+            0, self.battle.opponent.slot_a.active.boosts[constants.DEFENSE]
+        )
 
 
 class TestMove(unittest.TestCase):
@@ -1555,8 +1543,6 @@ class TestMove(unittest.TestCase):
 
         move(self.battle, split_msg)
 
-        expected_wish = (1, 100)
-
         self.assertEqual(
             0,
             self.battle.user.slot_a.active.volatile_status_durations[constants.PROTECT],
@@ -1570,7 +1556,7 @@ class TestTrickRoom(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
+        self.battle.opponent.slot_a.active = self.opponent_active
 
     def test_starts_trickroom_properly(self):
         split_msg = [
@@ -1605,9 +1591,9 @@ class TestWeather(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
+        self.battle.opponent.slot_a.active = self.opponent_active
         self.user_active = Pokemon("caterpie", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
     def test_starts_weather_properly(self):
         split_msg = [
@@ -1857,113 +1843,6 @@ class TestCureStatus(unittest.TestCase):
 
         self.assertEqual(0, self.opponent_reserve.sleep_turns)
         self.assertEqual(0, self.opponent_reserve.rest_turns)
-
-
-class TestStartFutureSight(unittest.TestCase):
-    def setUp(self):
-        self.battle = Battle(None)
-        self.battle.user.name = "p1"
-        self.battle.opponent.name = "p2"
-
-        self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-
-        self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
-
-    def test_sets_futuresight_on_side_that_used_the_move(self):
-        split_msg = ["", "-start", "p2a: Caterpie", "Future Sight"]
-        start_volatile_status(self.battle, split_msg)
-
-        self.assertEqual(self.battle.opponent.future_sight, (3, "caterpie"))
-
-    def test_does_not_set_futuresight_as_a_volatilestatus(self):
-        split_msg = ["", "-start", "p2a: Caterpie", "Future Sight"]
-        self.battle.opponent.active.volatile_statuses = []
-        start_volatile_status(self.battle, split_msg)
-
-        self.assertEqual([], self.battle.opponent.active.volatile_statuses)
-
-
-class TestSetItem(unittest.TestCase):
-    def setUp(self):
-        self.battle = Battle(None)
-        self.battle.user.name = "p1"
-        self.battle.opponent.name = "p2"
-
-        self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-
-        self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
-
-    def test_sets_remove_item_when_tricked(self):
-        split_msg = ["", "-item", "p2a: Caterpie", "Leftovers", "[from] move: Trick"]
-        self.battle.opponent.active.item = "choicescarf"
-        set_item(self.battle, split_msg)
-
-        self.assertEqual("leftovers", self.battle.opponent.active.item)
-        self.assertEqual("choicescarf", self.battle.opponent.active.removed_item)
-
-    def test_does_not_set_removed_item_when_removed_item_already_exists(self):
-        split_msg = ["", "-item", "p2a: Caterpie", "Choice Scarf", "[from] move: Trick"]
-        self.battle.opponent.active.item = "leftovers"
-        self.battle.opponent.active.removed_item = (
-            "choicescarf"  # should not be overwritten with leftovers
-        )
-        set_item(self.battle, split_msg)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-        self.assertEqual("choicescarf", self.battle.opponent.active.removed_item)
-
-    def test_does_not_set_removed_item_if_unknown(self):
-        split_msg = ["", "-item", "p2a: Caterpie", "Choice Scarf", "[from] move: Trick"]
-        self.battle.opponent.active.item = constants.UNKNOWN_ITEM
-        self.battle.opponent.active.removed_item = None
-        set_item(self.battle, split_msg)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-        self.assertEqual(None, self.battle.opponent.active.removed_item)
-
-    def test_two_trick_protocol_messages_properly_sets_opponents_removed_item(self):
-        split_msg_1 = ["", "-item", "p2a: Caterpie", "Leftovers", "[from] move: Trick"]
-        split_msg_2 = ["", "-item", "p1a: Weedle", "Choice Specs", "[from] move: Trick"]
-        self.battle.opponent.active.item = constants.UNKNOWN_ITEM
-        self.battle.opponent.active.removed_item = None
-        self.battle.user.active.item = "leftovers"
-        self.battle.user.active.removed_item = None
-        set_item(self.battle, split_msg_1)
-        set_item(self.battle, split_msg_2)
-
-        self.assertEqual("leftovers", self.battle.opponent.active.item)
-        self.assertEqual("choicespecs", self.battle.user.active.item)
-
-        self.assertEqual("choicespecs", self.battle.opponent.active.removed_item)
-
-    def test_two_trick_protocol_messages_does_not_overwrite_removed_item_for_opponent(
-        self,
-    ):
-        # trick had already previously swapped items so removed_item is already set for the opponent
-        split_msg_1 = [
-            "",
-            "-item",
-            "p2a: Caterpie",
-            "Choice Specs",
-            "[from] move: Trick",
-        ]
-        split_msg_2 = ["", "-item", "p1a: Weedle", "Leftovers", "[from] move: Trick"]
-        self.battle.opponent.active.item = "leftovers"
-        self.battle.opponent.active.removed_item = "choicespecs"
-        self.battle.user.active.item = "choicespecs"
-        self.battle.user.active.removed_item = None
-        set_item(self.battle, split_msg_1)
-        set_item(self.battle, split_msg_2)
-
-        self.assertEqual("choicespecs", self.battle.opponent.active.item)
-        self.assertEqual("leftovers", self.battle.user.active.item)
-
-        # unchanged because removed_item was already set
-        self.assertEqual("choicespecs", self.battle.opponent.active.removed_item)
 
 
 class TestStartVolatileStatus(unittest.TestCase):
@@ -2399,43 +2278,43 @@ class TestUpdateAbility(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
     def test_sets_as_one_spectrier(self):
-        self.battle.opponent.active.name = "calyrexshadow"
+        self.battle.opponent.slot_a.active.name = "calyrexshadow"
         split_msg = ["", "-ability", "p2a: Calyrex", "As One"]
         update_ability(self.battle, split_msg)
-        self.assertEqual("asonespectrier", self.battle.opponent.active.ability)
+        self.assertEqual("asonespectrier", self.battle.opponent.slot_a.active.ability)
 
     def test_sets_as_one_glastrier(self):
-        self.battle.opponent.active.name = "calyrexice"
+        self.battle.opponent.slot_a.active.name = "calyrexice"
         split_msg = ["", "-ability", "p2a: Calyrex", "As One"]
         update_ability(self.battle, split_msg)
-        self.assertEqual("asoneglastrier", self.battle.opponent.active.ability)
+        self.assertEqual("asoneglastrier", self.battle.opponent.slot_a.active.ability)
 
     def test_does_not_update_asoneglastrier_to_unnerve(self):
-        self.battle.opponent.active.name = "calyrexice"
+        self.battle.opponent.slot_a.active.name = "calyrexice"
         split_msg = ["", "-ability", "p2a: Calyrex", "As One"]
         update_ability(self.battle, split_msg)
         split_msg = ["", "-ability", "p2a: Calyrex", "Unnerve"]
         update_ability(self.battle, split_msg)
-        self.assertEqual("asoneglastrier", self.battle.opponent.active.ability)
+        self.assertEqual("asoneglastrier", self.battle.opponent.slot_a.active.ability)
 
     def test_does_not_update_asonespectrier_to_unnerve(self):
-        self.battle.opponent.active.name = "calyrexshadow"
+        self.battle.opponent.slot_a.active.name = "calyrexshadow"
         split_msg = ["", "-ability", "p2a: Calyrex", "As One"]
         update_ability(self.battle, split_msg)
         split_msg = ["", "-ability", "p2a: Calyrex", "Unnerve"]
         update_ability(self.battle, split_msg)
-        self.assertEqual("asonespectrier", self.battle.opponent.active.ability)
+        self.assertEqual("asonespectrier", self.battle.opponent.slot_a.active.ability)
 
     def test_sets_original_ability_from_trace(self):
-        self.battle.user.active.ability = "intimidate"
-        self.battle.opponent.active.ability = None
+        self.battle.user.slot_a.active.ability = "intimidate"
+        self.battle.opponent.slot_a.active.ability = None
 
         split_msg = [
             "",
@@ -2447,12 +2326,12 @@ class TestUpdateAbility(unittest.TestCase):
         ]
         update_ability(self.battle, split_msg)
 
-        self.assertEqual("intimidate", self.battle.opponent.active.ability)
-        self.assertEqual("trace", self.battle.opponent.active.original_ability)
+        self.assertEqual("intimidate", self.battle.opponent.slot_a.active.ability)
+        self.assertEqual("trace", self.battle.opponent.slot_a.active.original_ability)
 
     def test_sets_original_ability_from_trace_with_intimidate(self):
-        self.battle.user.active.ability = "intimidate"
-        self.battle.opponent.active.ability = None
+        self.battle.user.slot_a.active.ability = "intimidate"
+        self.battle.opponent.slot_a.active.ability = None
 
         # PS protocol sends 2 `-ability` messages here so just make sure everything is set properly
         split_msg_1 = ["", "-ability", "p2a: Caterpie", "Intimidate", "boost"]
@@ -2467,29 +2346,8 @@ class TestUpdateAbility(unittest.TestCase):
         update_ability(self.battle, split_msg_1)
         update_ability(self.battle, split_msg_2)
 
-        self.assertEqual("intimidate", self.battle.opponent.active.ability)
-        self.assertEqual("trace", self.battle.opponent.active.original_ability)
-
-    def test_sets_original_ability_from_trace_with_intimidate_for_bot(self):
-        self.battle.user.active.ability = "trace"
-        self.battle.opponent.active.ability = None
-
-        # PS protocol sends 2 `-ability` messages here so just make sure everything is set properly
-        split_msg_1 = ["", "-ability", "p1a: Caterpie", "Intimidate", "boost"]
-        split_msg_2 = [
-            "",
-            "-ability",
-            "p1a: Caterpie",
-            "Intimidate",
-            "[from] ability: Trace",
-            "[of] p2a: Caterpie",
-        ]
-        update_ability(self.battle, split_msg_1)
-        update_ability(self.battle, split_msg_2)
-
-        self.assertEqual("intimidate", self.battle.opponent.active.ability)
-        self.assertEqual("trace", self.battle.user.active.original_ability)
-        self.assertEqual("intimidate", self.battle.user.active.ability)
+        self.assertEqual("intimidate", self.battle.opponent.slot_a.active.ability)
+        self.assertEqual("trace", self.battle.opponent.slot_a.active.original_ability)
 
     def test_update_ability_from_ability_string_properly_updates_ability(self):
         split_msg = ["", "-ability", "p2a: Caterpie", "Lightning Rod", "boost"]
@@ -2497,7 +2355,7 @@ class TestUpdateAbility(unittest.TestCase):
 
         expected_ability = "lightningrod"
 
-        self.assertEqual(expected_ability, self.battle.opponent.active.ability)
+        self.assertEqual(expected_ability, self.battle.opponent.slot_a.active.ability)
 
     def test_update_ability_from_ability_string_properly_updates_ability_for_bot(self):
         split_msg = ["", "-ability", "p1a: Caterpie", "Lightning Rod", "boost"]
@@ -2505,7 +2363,7 @@ class TestUpdateAbility(unittest.TestCase):
 
         expected_ability = "lightningrod"
 
-        self.assertEqual(expected_ability, self.battle.user.active.ability)
+        self.assertEqual(expected_ability, self.battle.user.slot_a.active.ability)
 
 
 class TestSwapSideConditions(unittest.TestCase):
@@ -2515,11 +2373,11 @@ class TestSwapSideConditions(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
     def get_expected_empty_dict(self):
         # The defaultdict's start empty, but swapping them adds the values of 0 to them
@@ -2603,207 +2461,6 @@ class TestSwapSideConditions(unittest.TestCase):
         )
 
 
-class TestIllusionEnd(unittest.TestCase):
-    def setUp(self):
-        self.battle = Battle(None)
-        self.battle.user.name = "p1"
-        self.battle.opponent.name = "p2"
-
-        self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
-
-        self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
-
-    def test_zoroark_is_switched_in_pkmn(self):
-        self.battle.opponent.active = Pokemon("meloetta", 100)
-        self.battle.opponent.reserve = []
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, L82, M"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertEqual("zoroark", self.battle.opponent.active.name)
-
-    def test_pkmn_disguised_as_gets_original_hp(self):
-        self.battle.opponent.active = Pokemon("meloetta", 100)
-        self.battle.opponent.active.hp = 50
-        self.battle.opponent.active.max_hp = 100
-        self.battle.opponent.active.hp_at_switch_in = 100
-        self.battle.opponent.reserve = []
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, L82, M"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertEqual("meloetta", self.battle.opponent.reserve[0].name)
-        self.assertEqual(100, self.battle.opponent.reserve[0].hp)
-
-    def test_pkmn_disguised_as_gets_original_status(self):
-        self.battle.opponent.active = Pokemon("meloetta", 100)
-        self.battle.opponent.active.status = constants.PARALYZED
-        self.battle.opponent.active.status_at_switch_in = None
-        self.battle.opponent.reserve = []
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, L82, M"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertEqual("meloetta", self.battle.opponent.reserve[0].name)
-        self.assertIsNone(self.battle.opponent.reserve[0].status)
-
-    def test_zoroark_disguising_as_pokemon_results_in_that_pkmn_in_reserve(
-        self,
-    ):
-        """
-        Weirdly worded test, but basically:
-
-        If Zoroark was disguised as a previously unseen pkmn, that pkmn should be in the reserve
-        Normally theres some fuckery around levels but PokemonShowdown has Illusion Level Mod
-        """
-        self.battle.opponent.active = Pokemon("meloetta", 100)
-        self.battle.opponent.reserve = []
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, L82, M"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertEqual([Pokemon("meloetta", 100)], self.battle.opponent.reserve)
-
-    def test_moves_used_while_disguised_are_associated_with_zoroark(
-        self,
-    ):
-        """
-        zoroark (disguised as meloetta) used focusblast and flamethrower since it switched in
-        meloetta previously had hypervoice revealed
-        zoroark previously had flamethrower and nastysplot revealed
-
-        illusion ending in this scenario should apply focusblast to zoroark since that is the
-        un-revealed zoroark move. meloetta should have focusblast and flamethrower removed
-        """
-        meloetta = Pokemon("meloetta", 100)
-        meloetta.moves = [
-            Move("focusblast"),
-            Move("flamethrower"),
-            Move("hypervoice"),
-        ]
-        meloetta.moves_used_since_switch_in = ["focusblast", "flamethrower"]
-        zoroark = Pokemon("zoroark", 82)
-        zoroark.moves = [
-            Move("flamethrower"),
-            Move("nastyplot"),
-        ]
-        self.battle.opponent.active = meloetta
-        self.battle.opponent.reserve = [zoroark]
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, L82, M"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertEqual(Pokemon("zoroark", 82), self.battle.opponent.active)
-        self.assertEqual([Pokemon("meloetta", 100)], self.battle.opponent.reserve)
-        self.assertEqual([Move("hypervoice")], meloetta.moves)
-        self.assertEqual(
-            [Move("flamethrower"), Move("nastyplot"), Move("focusblast")], zoroark.moves
-        )
-
-    def test_moves_used_while_disguised_are_associated_with_previously_nonexistent_zoroark(
-        self,
-    ):
-        meloetta = Pokemon("meloetta", 100)
-        meloetta.moves = [
-            Move("focusblast"),
-            Move("flamethrower"),
-            Move("hypervoice"),
-        ]
-        meloetta.moves_used_since_switch_in = ["focusblast", "flamethrower"]
-        self.battle.opponent.active = meloetta
-        self.battle.opponent.reserve = []
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, L82, M"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertEqual(Pokemon("zoroark", 82), self.battle.opponent.active)
-        self.assertEqual([Pokemon("meloetta", 100)], self.battle.opponent.reserve)
-        self.assertEqual([Move("hypervoice")], meloetta.moves)
-        self.assertEqual(
-            [Move("focusblast"), Move("flamethrower")],
-            self.battle.opponent.active.moves,
-        )
-
-    def test_removes_zoroark_from_reserve_if_it_is_in_there(self):
-        zoroark = Pokemon("zoroark", 82)
-        self.battle.opponent.active = Pokemon("meloetta", 100)
-        self.battle.opponent.reserve = [zoroark]
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, L82, M"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertNotIn(zoroark, self.battle.opponent.reserve)
-
-    def test_does_not_set_base_name_for_illusion_ending(self):
-        self.battle.opponent.active = Pokemon("meloetta", 100)
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, L84, F"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertEqual("zoroark", self.battle.opponent.active.base_name)
-
-    def test_pulls_zoroark_out_of_reserves_if_it_is_in_there(self):
-        self.battle.opponent.active = Pokemon("meloetta", 100)
-        zoroark = Pokemon("zoroark", 100)
-        zoroark.moves = [
-            Move("flamethrower"),
-            Move("nastyplot"),
-            Move("focusblast"),
-            Move("darkpulse"),
-        ]
-        self.battle.opponent.reserve = [zoroark]
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, F"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertEqual("zoroark", self.battle.opponent.active.base_name)
-        self.assertEqual(4, len(self.battle.opponent.active.moves))
-
-    def test_does_nothing_if_zoroark_was_already_active_pkmn(self):
-        """
-        Logically this seems impossible but the client has places where it tries to infer a
-        zoroark based events that happen before the zoroark is revealed. If that was done
-        the zoroark would've been set as the active pkmn and the illusion ending event should
-        do nothing
-        """
-        self.battle.opponent.active = Pokemon("zoroark", 100)
-        self.battle.opponent.active.zoroark_disguised_as = "meloetta"
-        self.battle.opponent.active.moves = [
-            Move("flamethrower"),
-            Move("nastyplot"),
-            Move("focusblast"),
-            Move("darkpulse"),
-        ]
-        self.battle.opponent.reserve = [Pokemon("meloetta", 100)]
-        split_msg = ["", "replace", "p2a: Zoroark", "Zoroark, L84, F"]
-        illusion_end(self.battle, split_msg)
-
-        self.assertEqual("zoroark", self.battle.opponent.active.base_name)
-        self.assertEqual(None, self.battle.opponent.active.zoroark_disguised_as)
-        self.assertEqual("meloetta", self.battle.opponent.reserve[0].name)
-        self.assertEqual(4, len(self.battle.opponent.active.moves))
-
-
-class TestFail(unittest.TestCase):
-    def setUp(self):
-        self.battle = Battle(None)
-        self.battle.user.name = "p1"
-        self.battle.opponent.name = "p2"
-
-        self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
-
-        self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
-
-    def test_failed_effect_due_to_clearbody_sets_ability(self):
-        split_msg = [
-            "",
-            "-fail",
-            "p2a: Caterpie",
-            "unboost",
-            "[from] ability: Clear Body",
-            "[of] p2a: Caterpie",
-        ]
-        fail(self.battle, split_msg)
-        self.assertEqual("clearbody", self.battle.opponent.active.ability)
-
-
 class TestFormChange(unittest.TestCase):
     def setUp(self):
         self.battle = Battle(None)
@@ -2811,14 +2468,14 @@ class TestFormChange(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
     def test_changes_with_formechange_message(self):
-        self.battle.opponent.active = Pokemon("meloetta", 100)
+        self.battle.opponent.slot_a.active = Pokemon("meloetta", 100)
         split_msg = [
             "",
             "-formechange",
@@ -2828,11 +2485,11 @@ class TestFormChange(unittest.TestCase):
         ]
         form_change(self.battle, split_msg)
 
-        self.assertEqual("meloettapirouette", self.battle.opponent.active.name)
+        self.assertEqual("meloettapirouette", self.battle.opponent.slot_a.active.name)
 
     def test_preserves_boosts(self):
-        self.battle.opponent.active = Pokemon("meloetta", 100)
-        self.battle.opponent.active.boosts = {constants.ATTACK: 2}
+        self.battle.opponent.slot_a.active = Pokemon("meloetta", 100)
+        self.battle.opponent.slot_a.active.boosts = {constants.ATTACK: 2}
         split_msg = [
             "",
             "-formechange",
@@ -2842,11 +2499,11 @@ class TestFormChange(unittest.TestCase):
         ]
         form_change(self.battle, split_msg)
 
-        self.assertEqual(2, self.battle.opponent.active.boosts[constants.ATTACK])
+        self.assertEqual(2, self.battle.opponent.slot_a.active.boosts[constants.ATTACK])
 
     def test_preserves_status(self):
-        self.battle.opponent.active = Pokemon("meloetta", 100)
-        self.battle.opponent.active.status = constants.BURN
+        self.battle.opponent.slot_a.active = Pokemon("meloetta", 100)
+        self.battle.opponent.slot_a.active.status = constants.BURN
         split_msg = [
             "",
             "-formechange",
@@ -2856,11 +2513,11 @@ class TestFormChange(unittest.TestCase):
         ]
         form_change(self.battle, split_msg)
 
-        self.assertEqual(constants.BURN, self.battle.opponent.active.status)
+        self.assertEqual(constants.BURN, self.battle.opponent.slot_a.active.status)
 
     def test_preserves_item(self):
-        self.battle.opponent.active = Pokemon("aegislash", 100)
-        self.battle.opponent.active.item = "airballoon"
+        self.battle.opponent.slot_a.active = Pokemon("aegislash", 100)
+        self.battle.opponent.slot_a.active.item = "airballoon"
         split_msg = [
             "",
             "-formechange",
@@ -2870,10 +2527,10 @@ class TestFormChange(unittest.TestCase):
         ]
         form_change(self.battle, split_msg)
 
-        self.assertEqual("airballoon", self.battle.opponent.active.item)
+        self.assertEqual("airballoon", self.battle.opponent.slot_a.active.item)
 
     def test_preserves_base_name_when_form_changes(self):
-        self.battle.opponent.active = Pokemon("meloetta", 100)
+        self.battle.opponent.slot_a.active = Pokemon("meloetta", 100)
         split_msg = [
             "",
             "-formechange",
@@ -2883,11 +2540,11 @@ class TestFormChange(unittest.TestCase):
         ]
         form_change(self.battle, split_msg)
 
-        self.assertEqual("meloetta", self.battle.opponent.active.base_name)
+        self.assertEqual("meloetta", self.battle.opponent.slot_a.active.base_name)
 
     def test_multiple_forme_changes_does_not_ruin_base_name(self):
-        self.battle.user.active = Pokemon("pikachu", 100)
-        self.battle.opponent.active = Pokemon("pikachu", 100)
+        self.battle.user.slot_a.active = Pokemon("pikachu", 100)
+        self.battle.opponent.slot_a.active = Pokemon("pikachu", 100)
         self.battle.opponent.reserve = []
         self.battle.opponent.reserve.append(Pokemon("wishiwashi", 100))
 
@@ -2941,42 +2598,45 @@ class TestClearNegativeBoost(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
+        self.battle.opponent.slot_a.active = self.opponent_active
 
     def test_clears_negative_boosts(self):
-        self.battle.opponent.active.boosts = {constants.ATTACK: -1}
-        split_msg = ["-clearnegativeboost", "p2a: caterpie", "[silent]"]
+        self.battle.opponent.slot_a.active.boosts = {constants.ATTACK: -1}
+        split_msg = ["", "-clearnegativeboost", "p2a: caterpie", "[silent]"]
         clearnegativeboost(self.battle, split_msg)
 
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.ATTACK])
+        self.assertEqual(0, self.battle.opponent.slot_a.active.boosts[constants.ATTACK])
 
     def test_clears_multiple_negative_boosts(self):
-        self.battle.opponent.active.boosts = {constants.ATTACK: -1, constants.SPEED: -1}
-        split_msg = ["-clearnegativeboost", "p2a: caterpie", "[silent]"]
+        self.battle.opponent.slot_a.active.boosts = {
+            constants.ATTACK: -1,
+            constants.SPEED: -1,
+        }
+        split_msg = ["", "-clearnegativeboost", "p2a: caterpie", "[silent]"]
         clearnegativeboost(self.battle, split_msg)
 
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.ATTACK])
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.SPEED])
+        self.assertEqual(0, self.battle.opponent.slot_a.active.boosts[constants.ATTACK])
+        self.assertEqual(0, self.battle.opponent.slot_a.active.boosts[constants.SPEED])
 
     def test_does_not_clear_positive_boost(self):
-        self.battle.opponent.active.boosts = {constants.ATTACK: 1}
-        split_msg = ["-clearnegativeboost", "p2a: caterpie", "[silent]"]
+        self.battle.opponent.slot_a.active.boosts = {constants.ATTACK: 1}
+        split_msg = ["", "-clearnegativeboost", "p2a: caterpie", "[silent]"]
         clearnegativeboost(self.battle, split_msg)
 
-        self.assertEqual(1, self.battle.opponent.active.boosts[constants.ATTACK])
+        self.assertEqual(1, self.battle.opponent.slot_a.active.boosts[constants.ATTACK])
 
     def test_clears_only_negative_boosts(self):
-        self.battle.opponent.active.boosts = {
+        self.battle.opponent.slot_a.active.boosts = {
             constants.ATTACK: 1,
             constants.SPECIAL_ATTACK: 1,
             constants.SPEED: 1,
             constants.DEFENSE: -1,
             constants.SPECIAL_DEFENSE: -1,
         }
-        split_msg = ["-clearnegativeboost", "p2a: caterpie", "[silent]"]
+        split_msg = ["", "-clearnegativeboost", "p2a: caterpie", "[silent]"]
         clearnegativeboost(self.battle, split_msg)
 
         expected_boosts = {
@@ -2987,7 +2647,7 @@ class TestClearNegativeBoost(unittest.TestCase):
             constants.SPECIAL_DEFENSE: 0,
         }
 
-        self.assertEqual(expected_boosts, self.battle.opponent.active.boosts)
+        self.assertEqual(expected_boosts, self.battle.opponent.slot_a.active.boosts)
 
 
 class TestClearBoost(unittest.TestCase):
@@ -2997,64 +2657,32 @@ class TestClearBoost(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
+        self.battle.opponent.slot_a.active = self.opponent_active
 
     def test_clears_boost(self):
-        self.battle.opponent.active.boosts = {constants.ATTACK: 2}
-        split_msg = ["-clearboost", "p2a: caterpie", "[silent]"]
+        self.battle.opponent.slot_a.active.boosts = {constants.ATTACK: 2}
+        split_msg = ["", "-clearboost", "p2a: caterpie", "[silent]"]
         clearboost(self.battle, split_msg)
 
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.ATTACK])
+        self.assertEqual(0, self.battle.opponent.slot_a.active.boosts[constants.ATTACK])
 
     def test_clears_multiple_boosts(self):
-        self.battle.opponent.active.boosts = {
+        self.battle.opponent.slot_a.active.boosts = {
             constants.ATTACK: 2,
             constants.SPEED: 1,
             constants.SPECIAL_ATTACK: -3,
         }
-        split_msg = ["-clearboost", "p2a: caterpie", "[silent]"]
+        split_msg = ["", "-clearboost", "p2a: caterpie", "[silent]"]
         clearboost(self.battle, split_msg)
 
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.ATTACK])
+        self.assertEqual(0, self.battle.opponent.slot_a.active.boosts[constants.ATTACK])
         self.assertEqual(
-            0, self.battle.opponent.active.boosts[constants.SPECIAL_ATTACK]
+            0, self.battle.opponent.slot_a.active.boosts[constants.SPECIAL_ATTACK]
         )
-        self.assertEqual(0, self.battle.opponent.active.boosts[constants.SPEED])
-
-
-class TestZPower(unittest.TestCase):
-    def setUp(self):
-        self.battle = Battle(None)
-        self.battle.user.name = "p1"
-        self.battle.opponent.name = "p2"
-
-        self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
-
-        self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
-
-        self.username = "CoolUsername"
-
-        self.battle.username = self.username
-
-    def test_sets_item_to_none(self):
-        split_msg = ["", "-zpower", "p2a: Pkmn"]
-        self.battle.opponent.active.item = "some_item"
-        zpower(self.battle, split_msg)
-
-        self.assertEqual(None, self.battle.opponent.active.item)
-
-    def test_does_not_set_item_when_the_bot_moves(self):
-        split_msg = ["", "-zpower", "p1a: Pkmn"]
-        self.battle.opponent.active.item = "some_item"
-        zpower(self.battle, split_msg)
-
-        self.assertEqual("some_item", self.battle.opponent.active.item)
+        self.assertEqual(0, self.battle.opponent.slot_a.active.boosts[constants.SPEED])
 
 
 class TestSideStart(unittest.TestCase):
@@ -3064,11 +2692,13 @@ class TestSideStart(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
+        self.battle.opponent.slot_b.active = Pokemon("beedrill", 100)
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
+        self.battle.user.slot_b.active = Pokemon("beedrill", 100)
 
         self.username = "CoolUsername"
 
@@ -3101,7 +2731,7 @@ class TestSideStart(unittest.TestCase):
 
     def test_lightscreen_gets_8_turns_with_lightclay(self):
         split_msg = ["", "-sidestart", "p2", "move: Light Screen"]
-        self.battle.opponent.active.item = "lightclay"
+        self.battle.opponent.slot_a.active.item = "lightclay"
         sidestart(self.battle, split_msg)
         self.assertEqual(
             8, self.battle.opponent.side_conditions[constants.LIGHT_SCREEN]
@@ -3109,7 +2739,7 @@ class TestSideStart(unittest.TestCase):
 
     def test_auroraveil_gets_8_turns_with_lightclay(self):
         split_msg = ["", "-sidestart", "p2", "move: Aurora Veil"]
-        self.battle.opponent.active.item = "lightclay"
+        self.battle.opponent.slot_a.active.item = "lightclay"
         sidestart(self.battle, split_msg)
         self.assertEqual(8, self.battle.opponent.side_conditions[constants.AURORA_VEIL])
 
@@ -3126,11 +2756,11 @@ class TestSingleTurn(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
         self.username = "CoolUsername"
 
@@ -3140,13 +2770,23 @@ class TestSingleTurn(unittest.TestCase):
         split_msg = ["", "-singleturn", "p2a: Caterpie", "Protect"]
         singleturn(self.battle, split_msg)
 
-        self.assertEqual(2, self.battle.opponent.side_conditions[constants.PROTECT])
+        self.assertEqual(
+            2,
+            self.battle.opponent.slot_a.active.volatile_status_durations[
+                constants.PROTECT
+            ],
+        )
 
     def test_sets_protect_side_condition_when_endure_is_used(self):
         split_msg = ["", "-singleturn", "p2a: Caterpie", "Endure"]
         singleturn(self.battle, split_msg)
 
-        self.assertEqual(2, self.battle.opponent.side_conditions[constants.PROTECT])
+        self.assertEqual(
+            2,
+            self.battle.opponent.slot_a.active.volatile_status_durations[
+                constants.PROTECT
+            ],
+        )
 
     def test_does_not_set_for_non_protect_move(self):
         split_msg = ["", "-singleturn", "p2a: Caterpie", "Roost"]
@@ -3158,243 +2798,21 @@ class TestSingleTurn(unittest.TestCase):
         split_msg = ["", "-singleturn", "p1a: Weedle", "Protect"]
         singleturn(self.battle, split_msg)
 
-        self.assertEqual(2, self.battle.user.side_conditions[constants.PROTECT])
+        self.assertEqual(
+            2,
+            self.battle.user.slot_a.active.volatile_status_durations[constants.PROTECT],
+        )
 
     def test_sets_protect_side_condition_when_prefixed_by_move(self):
         split_msg = ["", "-singleturn", "p2a: Caterpie", "move: Protect"]
         singleturn(self.battle, split_msg)
 
-        self.assertEqual(2, self.battle.opponent.side_conditions[constants.PROTECT])
-
-
-class TestTransform(unittest.TestCase):
-    def setUp(self):
-        self.battle = Battle(None)
-        self.battle.user.name = "p1"
-        self.battle.opponent.name = "p2"
-
-        self.opponent_active = Pokemon("Ditto", 100)
-        self.battle.opponent.active = self.opponent_active
-
-        self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
-
-        self.username = "CoolUsername"
-
-        self.battle.username = self.username
-
-        self.user_active_stats = {
-            "atk": 103,
-            "def": 214,
-            "spa": 118,
-            "spd": 132,
-            "spe": 132,
-        }
-        self.user_active_ability = "levitate"
-        self.user_active_moves = [
-            "dracometeor",
-            "darkpulse",
-            "flashcannon",
-            "fireblast",
-        ]
-        self.request_json = {
-            "active": [
-                {
-                    "moves": [
-                        {
-                            "move": "Draco Meteor",
-                            "id": "dracometeor",
-                            "pp": 5,
-                            "maxpp": 5,
-                            "target": "normal",
-                            "disabled": False,
-                        },
-                        {
-                            "move": "Dark Pulse",
-                            "id": "darkpulse",
-                            "pp": 5,
-                            "maxpp": 5,
-                            "target": "any",
-                            "disabled": False,
-                        },
-                        {
-                            "move": "Flash Cannon",
-                            "id": "flashcannon",
-                            "pp": 5,
-                            "maxpp": 5,
-                            "target": "normal",
-                            "disabled": False,
-                        },
-                        {
-                            "move": "Fire Blast",
-                            "id": "fireblast",
-                            "pp": 5,
-                            "maxpp": 5,
-                            "target": "normal",
-                            "disabled": False,
-                        },
-                    ],
-                    "canDynamax": True,
-                    "maxMoves": {
-                        "maxMoves": [
-                            {"move": "maxwyrmwind", "target": "adjacentFoe"},
-                            {"move": "maxdarkness", "target": "adjacentFoe"},
-                            {"move": "maxsteelspike", "target": "adjacentFoe"},
-                            {"move": "maxflare", "target": "adjacentFoe"},
-                        ]
-                    },
-                }
+        self.assertEqual(
+            2,
+            self.battle.opponent.slot_a.active.volatile_status_durations[
+                constants.PROTECT
             ],
-            "side": {
-                "name": "BigBluePikachu",
-                "id": "p2",
-                "pokemon": [
-                    {
-                        "ident": "p1: Weedle",
-                        "details": "Weedle",
-                        "condition": "299/299",
-                        "active": True,
-                        "stats": self.user_active_stats,
-                        "moves": self.user_active_moves,
-                        "baseAbility": self.user_active_ability,
-                        "item": "choicescarf",
-                        "pokeball": "pokeball",
-                        "ability": self.user_active_ability,
-                    },
-                    {
-                        "ident": "p1: Charmander",
-                        "details": "Charmander",
-                        "condition": "299/299",
-                        "active": False,
-                        "stats": {"atk": 1, "def": 2, "spa": 3, "spd": 4, "spe": 5},
-                        "moves": ["flamethrower", "firespin", "scratch", "growl"],
-                        "baseAbility": "blaze",
-                        "item": "sitrusberry",
-                        "pokeball": "pokeball",
-                        "ability": "blaze",
-                    },
-                ],
-            },
-        }
-
-        self.battle.request_json = self.request_json
-
-    def test_transform_sets_ability_to_opposing_pokemons_ability(self):
-        self.battle.user.active.ability = self.user_active_ability
-        self.battle.opponent.active.ability = None
-        split_msg = [
-            "",
-            "-transform",
-            "p2a: Ditto",
-            "p1a: Weedle",
-            "[from] ability: Imposter",
-        ]
-
-        if self.battle.user.active.ability == self.battle.opponent.active.ability:
-            self.fail("Abilities were equal before transform")
-
-        transform(self.battle, split_msg)
-
-        self.assertEqual(self.user_active_ability, self.battle.opponent.active.ability)
-        self.assertEqual("imposter", self.battle.opponent.active.original_ability)
-
-    def test_transform_sets_moves_to_opposing_pokemons_moves(self):
-        self.battle.user.active.moves = [
-            Move("dracometeor"),
-            Move("darkpulse"),
-            Move("flashcannon"),
-            Move("fireblast"),
-        ]
-        split_msg = [
-            "",
-            "-transform",
-            "p2a: Ditto",
-            "p1a: Weedle",
-            "[from] ability: Imposter",
-        ]
-
-        if self.battle.user.active.moves == self.battle.opponent.active.moves:
-            self.fail("Moves were equal before transform")
-
-        transform(self.battle, split_msg)
-
-        self.assertEqual(
-            self.battle.user.active.moves, self.battle.opponent.active.moves
         )
-
-    def test_transform_sets_types_to_opposing_pokemons_types(self):
-        self.battle.user.active.types = ["flying", "dragon"]
-        self.battle.opponent.active.types = ["normal"]
-        split_msg = [
-            "",
-            "-transform",
-            "p2a: Ditto",
-            "p1a: Weedle",
-            "[from] ability: Imposter",
-        ]
-
-        transform(self.battle, split_msg)
-
-        self.assertEqual(
-            self.battle.user.active.types, self.battle.opponent.active.types
-        )
-
-    def test_transform_sets_boosts_to_opposing_pokemons_boosts(self):
-        self.battle.user.active.boosts = defaultdict(
-            lambda: 0,
-            {
-                constants.ATTACK: 1,
-                constants.DEFENSE: 2,
-                constants.SPECIAL_ATTACK: 3,
-                constants.SPECIAL_DEFENSE: 4,
-                constants.SPEED: 5,
-            },
-        )
-        self.battle.opponent.active.boosts = {}
-
-        split_msg = [
-            "",
-            "-transform",
-            "p2a: Ditto",
-            "p1a: Weedle",
-            "[from] ability: Imposter",
-        ]
-
-        transform(self.battle, split_msg)
-
-        self.assertEqual(
-            self.battle.user.active.boosts, self.battle.opponent.active.boosts
-        )
-
-    def test_transform_sets_transform_volatile_status(self):
-        self.battle.user.active.volatile_statuses = []
-        split_msg = [
-            "",
-            "-transform",
-            "p2a: Ditto",
-            "p1a: Weedle",
-            "[from] ability: Imposter",
-        ]
-
-        transform(self.battle, split_msg)
-
-        self.assertIn(
-            constants.TRANSFORM, self.battle.opponent.active.volatile_statuses
-        )
-
-    def test_transform_sets_volatile_for_bots_side(self):
-        self.battle.user.active.volatile_statuses = []
-        split_msg = [
-            "",
-            "-transform",
-            "p1a: Weedle",
-            "p1a: Weedle",
-            "[from] ability: Imposter",
-        ]
-
-        transform(self.battle, split_msg)
-
-        self.assertIn(constants.TRANSFORM, self.battle.user.active.volatile_statuses)
 
 
 class TestCant(unittest.TestCase):
@@ -3404,36 +2822,38 @@ class TestCant(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
+        self.battle.opponent.slot_a.active = self.opponent_active
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
     def test_increments_sleep_turns_when_cant_from_sleep(self):
-        self.battle.user.active.sleep_turns = 0
-        self.battle.user.active.status = constants.SLEEP
+        self.battle.user.slot_a.active.sleep_turns = 0
+        self.battle.user.slot_a.active.status = constants.SLEEP
         cant(self.battle, ["", "-cant", "p1a: Weedle", "slp"])
-        self.assertEqual(1, self.battle.user.active.sleep_turns)
+        self.assertEqual(1, self.battle.user.slot_a.active.sleep_turns)
 
     def test_removes_truant_when_cant_from_truant(self):
-        self.battle.user.active.sleep_turns = 0
-        self.battle.user.active.volatile_statuses.append("truant")
+        self.battle.user.slot_a.active.sleep_turns = 0
+        self.battle.user.slot_a.active.volatile_statuses.append("truant")
         cant(self.battle, ["", "-cant", "p1a: Slaking", "ability: Truant"])
-        self.assertNotIn("truant", self.battle.user.active.volatile_statuses)
+        self.assertNotIn("truant", self.battle.user.slot_a.active.volatile_statuses)
 
     def test_removes_mustrecharge_when_cant_from_recharge(self):
-        self.battle.user.active.sleep_turns = 0
-        self.battle.user.active.volatile_statuses.append("mustrecharge")
+        self.battle.user.slot_a.active.sleep_turns = 0
+        self.battle.user.slot_a.active.volatile_statuses.append("mustrecharge")
         cant(self.battle, ["", "-cant", "p1a: Slaking", "recharge"])
-        self.assertNotIn("mustrecharge", self.battle.user.active.volatile_statuses)
+        self.assertNotIn(
+            "mustrecharge", self.battle.user.slot_a.active.volatile_statuses
+        )
 
     def test_only_decrements_rest_turns_when_cant_from_sleep_with_a_rest_turn(self):
-        self.battle.user.active.sleep_turns = 0
-        self.battle.user.active.rest_turns = 3
-        self.battle.user.active.status = constants.SLEEP
+        self.battle.user.slot_a.active.sleep_turns = 0
+        self.battle.user.slot_a.active.rest_turns = 3
+        self.battle.user.slot_a.active.status = constants.SLEEP
         cant(self.battle, ["", "-cant", "p1a: Weedle", "slp"])
-        self.assertEqual(0, self.battle.user.active.sleep_turns)
-        self.assertEqual(2, self.battle.user.active.rest_turns)
+        self.assertEqual(0, self.battle.user.slot_a.active.sleep_turns)
+        self.assertEqual(2, self.battle.user.slot_a.active.rest_turns)
 
 
 class TestUpkeep(unittest.TestCase):
@@ -3443,45 +2863,37 @@ class TestUpkeep(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_b.active = Pokemon("beedrill", 100)
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
-
-    def test_gen3_increments_taunt_duration_end_of_turn(self):
-        self.battle.generation = "gen3"
-        self.battle.opponent.active.volatile_statuses = [constants.TAUNT]
-        self.battle.opponent.active.volatile_status_durations[constants.TAUNT] = 0
-        upkeep(self.battle, "")
-        self.assertEqual(
-            1, self.battle.opponent.active.volatile_status_durations[constants.TAUNT]
-        )
-
-    def test_gen5_does_not_increment_taunt_duration_end_of_turn(self):
-        self.battle.generation = "gen5"
-        self.battle.opponent.active.volatile_statuses = [constants.TAUNT]
-        self.battle.opponent.active.volatile_status_durations[constants.TAUNT] = 0
-        upkeep(self.battle, "")
-        self.assertEqual(
-            0, self.battle.opponent.active.volatile_status_durations[constants.TAUNT]
-        )
+        self.battle.user.slot_a.active = self.user_active
+        self.battle.user.slot_b.active = Pokemon("beedrill", 100)
 
     def test_decrements_slowstart_volatile_duration(self):
-        self.battle.user.active.volatile_statuses.append(constants.SLOW_START)
-        self.battle.user.active.volatile_status_durations[constants.SLOW_START] = 5
+        self.battle.user.slot_a.active.volatile_statuses.append(constants.SLOW_START)
+        self.battle.user.slot_a.active.volatile_status_durations[
+            constants.SLOW_START
+        ] = 5
         upkeep(self.battle, "")
         self.assertEqual(
             4,
-            self.battle.user.active.volatile_status_durations[constants.SLOW_START],
+            self.battle.user.slot_a.active.volatile_status_durations[
+                constants.SLOW_START
+            ],
         )
 
     def test_increments_lockedmove_end_of_turn(self):
-        self.battle.opponent.active.volatile_statuses.append(constants.LOCKED_MOVE)
-        self.battle.opponent.active.volatile_status_durations[constants.LOCKED_MOVE] = 0
+        self.battle.opponent.slot_a.active.volatile_statuses.append(
+            constants.LOCKED_MOVE
+        )
+        self.battle.opponent.slot_a.active.volatile_status_durations[
+            constants.LOCKED_MOVE
+        ] = 0
         upkeep(self.battle, "")
         self.assertEqual(
             1,
-            self.battle.opponent.active.volatile_status_durations[
+            self.battle.opponent.slot_a.active.volatile_status_durations[
                 constants.LOCKED_MOVE
             ],
         )
@@ -3543,34 +2955,11 @@ class TestUpkeep(unittest.TestCase):
         upkeep(self.battle, "")
         self.assertEqual(0, self.battle.field_turns_remaining)
 
-    def test_resets_sleep_turns_to_zero_after_not_using_sleeptalk(self):
-        self.battle.generation = "gen3"
-        self.battle.user.active.status = constants.SLEEP
-        self.battle.user.active.gen_3_consecutive_sleep_talks = 1
-
-        cant(self.battle, ["", "-cant", "p1a: Weedle", "slp"])
-        upkeep(self.battle, "")
-
-        self.assertEqual(0, self.battle.user.active.gen_3_consecutive_sleep_talks)
-
-    def test_does_not_reset_sleep_turns_when_sleeptalk_used(self):
-        self.battle.generation = "gen3"
-        self.battle.user.active.status = constants.SLEEP
-        self.battle.user.active.gen_3_consecutive_sleep_talks = 1
-
-        cant(self.battle, ["", "-cant", "p1a: Weedle", "slp"])
-        move(self.battle, ["", "move", "p1a: Weedle", "Sleeptalk"])
-        move(self.battle, ["", "move", "p1a: Weedle", "Tackle", "[from]Sleep Talk"])
-        upkeep(self.battle, "")
-
-        self.assertEqual(2, self.battle.user.active.gen_3_consecutive_sleep_talks)
-        self.assertEqual("sleeptalk", self.battle.user.last_used_move.move)
-
     def test_increments_yawn_duration(self):
-        self.battle.user.active.volatile_statuses.append(constants.YAWN)
+        self.battle.user.slot_a.active.volatile_statuses.append(constants.YAWN)
         upkeep(self.battle, "")
         self.assertEqual(
-            1, self.battle.user.active.volatile_status_durations[constants.YAWN]
+            1, self.battle.user.slot_a.active.volatile_status_durations[constants.YAWN]
         )
 
     def test_decrements_trickroom_in_upkeep(self):
@@ -3580,32 +2969,40 @@ class TestUpkeep(unittest.TestCase):
         self.assertEqual(4, self.battle.trick_room_turns_remaining)
 
     def test_swaps_out_yawn_for_yawnSleepThisTurn_opponent(self):
-        self.battle.opponent.active.volatile_statuses.append(constants.YAWN)
-        self.battle.opponent.active.volatile_status_durations[constants.YAWN] = 0
+        self.battle.opponent.slot_a.active.volatile_statuses.append(constants.YAWN)
+        self.battle.opponent.slot_a.active.volatile_status_durations[constants.YAWN] = 0
         upkeep(self.battle, "")
         self.assertIn(
             constants.YAWN,
-            self.battle.opponent.active.volatile_statuses,
+            self.battle.opponent.slot_a.active.volatile_statuses,
         )
         self.assertEqual(
-            1, self.battle.opponent.active.volatile_status_durations[constants.YAWN]
+            1,
+            self.battle.opponent.slot_a.active.volatile_status_durations[
+                constants.YAWN
+            ],
         )
 
     def test_removes_yawnSleepNextTurn(self):
-        self.battle.user.active.volatile_statuses.append(constants.YAWN)
-        self.battle.user.active.volatile_status_durations[constants.YAWN] = 1
+        self.battle.user.slot_a.active.volatile_statuses.append(constants.YAWN)
+        self.battle.user.slot_a.active.volatile_status_durations[constants.YAWN] = 1
         upkeep(self.battle, "")
         self.assertEqual(
-            0, self.battle.user.active.volatile_status_durations[constants.YAWN]
+            0, self.battle.user.slot_a.active.volatile_status_durations[constants.YAWN]
         )
-        self.assertNotIn(constants.YAWN, self.battle.user.active.volatile_statuses)
+        self.assertNotIn(
+            constants.YAWN, self.battle.user.slot_a.active.volatile_statuses
+        )
 
     def test_reduces_protect_for_bot(self):
         self.battle.user.side_conditions[constants.PROTECT] = 1
 
         upkeep(self.battle, "")
 
-        self.assertEqual(self.battle.user.side_conditions[constants.PROTECT], 0)
+        self.assertEqual(
+            self.battle.user.slot_a.active.volatile_status_durations[constants.PROTECT],
+            0,
+        )
 
     def test_does_not_reduce_protect_when_it_is_0(self):
         self.battle.user.side_conditions[constants.PROTECT] = 0
@@ -3614,60 +3011,12 @@ class TestUpkeep(unittest.TestCase):
 
         self.assertEqual(self.battle.user.side_conditions[constants.PROTECT], 0)
 
-    def test_reduces_wish_if_it_is_larger_than_0_for_the_opponent(self):
-        self.battle.opponent.wish = (2, 100)
-
-        upkeep(self.battle, "")
-
-        self.assertEqual(self.battle.opponent.wish, (1, 100))
-
-    def test_reduces_wish_if_it_is_larger_than_0_for_the_bot(self):
-        self.battle.user.wish = (2, 100)
-
-        upkeep(self.battle, "")
-
-        self.assertEqual(self.battle.user.wish, (1, 100))
-
     def test_does_not_reduce_wish_if_it_is_0(self):
         self.battle.user.wish = (0, 100)
 
         upkeep(self.battle, "")
 
         self.assertEqual(self.battle.user.wish, (0, 100))
-
-    def test_reduces_future_sight_if_it_is_larger_than_0_for_the_bot(self):
-        self.battle.user.future_sight = (2, "pokemon_name")
-
-        upkeep(self.battle, "")
-
-        self.assertEqual(self.battle.user.future_sight, (1, "pokemon_name"))
-
-    def test_does_not_reduce_future_sight_if_it_is_0(self):
-        self.battle.user.future_sight = (0, "pokemon_name")
-
-        upkeep(self.battle, "")
-
-        self.assertEqual(self.battle.user.future_sight, (0, "pokemon_name"))
-
-    def test_adds_leftovers_blacksludge_to_impossible_items_at_end_of_turn(self):
-        self.battle.opponent.active.hp = 50
-        upkeep(self.battle, "")
-        self.assertIn(constants.LEFTOVERS, self.battle.opponent.active.impossible_items)
-        self.assertIn(
-            constants.BLACK_SLUDGE, self.battle.opponent.active.impossible_items
-        )
-
-    def test_adds_flameorb_toxicorb_if_status_is_none_at_end_of_turn(self):
-        self.battle.opponent.active.status = None
-        upkeep(self.battle, "")
-        self.assertIn("flameorb", self.battle.opponent.active.impossible_items)
-        self.assertIn("toxicorb", self.battle.opponent.active.impossible_items)
-
-    def test_does_not_add_flameorb_toxicorb_if_status_exists_at_end_of_turn(self):
-        self.battle.opponent.active.status = constants.FROZEN
-        upkeep(self.battle, "")
-        self.assertNotIn("flameorb", self.battle.opponent.active.impossible_items)
-        self.assertNotIn("toxicorb", self.battle.opponent.active.impossible_items)
 
 
 class TestCheckSpeedRanges(unittest.TestCase):
@@ -3677,11 +3026,11 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
 
         self.user_active = Pokemon("caterpie", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
         self.username = "CoolUsername"
 
@@ -3698,24 +3047,26 @@ class TestCheckSpeedRanges(unittest.TestCase):
         }
 
     def test_protosynthesis_speed_is_accounted_for_in_speed_range_check(self):
-        self.battle.user.active.stats[constants.SPEED] = 300
-        self.battle.user.active.boosts[constants.SPEED] = 1
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 300
+        self.battle.user.slot_a.active.boosts[constants.SPEED] = 1
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "tackle", 0)
 
-        self.battle.opponent.active.stats[constants.SPEED] = 370
-        self.battle.opponent.active.volatile_statuses.append("protosynthesisspe")
+        self.battle.opponent.slot_a.active.stats[constants.SPEED] = 370
+        self.battle.opponent.slot_a.active.volatile_statuses.append("protosynthesisspe")
 
         messages = [
             "|move|p2a: Pikachu|U-turn|p1a: Caterpie",
-            "|-damage|p1a: Caterpie|0 fnt",
+            "|move|p1a: Caterpie|Tackle|p1a: Caterpie",
             "|faint|p2a: Caterpie",
         ]
         check_speed_ranges(self.battle, messages)
-        self.assertEqual(300, self.battle.opponent.active.speed_range.min)  # unchanged
+        self.assertEqual(
+            300, self.battle.opponent.slot_a.active.speed_range.min
+        )  # unchanged
 
     def test_recharging_makes_this_check_not_happen(self):
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.stats[constants.SPEED] = 100
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "agility", 0)
 
         messages = [
@@ -3726,11 +3077,13 @@ class TestCheckSpeedRanges(unittest.TestCase):
             "|turn|7",
         ]
         check_speed_ranges(self.battle, messages)
-        self.assertEqual(0, self.battle.opponent.active.speed_range.min)  # unchanged
+        self.assertEqual(
+            0, self.battle.opponent.slot_a.active.speed_range.min
+        )  # unchanged
 
     def test_hit_self_in_confusion_makes_this_check_not_happen(self):
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.stats[constants.SPEED] = 100
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "agility", 0)
 
         messages = [
@@ -3742,11 +3095,13 @@ class TestCheckSpeedRanges(unittest.TestCase):
             "|turn|7",
         ]
         check_speed_ranges(self.battle, messages)
-        self.assertEqual(0, self.battle.opponent.active.speed_range.min)  # unchanged
+        self.assertEqual(
+            0, self.battle.opponent.slot_a.active.speed_range.min
+        )  # unchanged
 
     def test_boosting_speed_after_opponent_does_not_mess_up_speed_range_check(self):
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.stats[constants.SPEED] = 100
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "agility", 0)
 
         messages = [
@@ -3758,11 +3113,11 @@ class TestCheckSpeedRanges(unittest.TestCase):
             "|turn|7",
         ]
         check_speed_ranges(self.battle, messages)
-        self.assertEqual(150, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(150, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_boosting_speed_before_opponent_does_not_mess_up_speed_range_check(self):
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.stats[constants.SPEED] = 100
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "agility", 0)
 
         messages = [
@@ -3774,30 +3129,13 @@ class TestCheckSpeedRanges(unittest.TestCase):
             "|turn|7",
         ]
         check_speed_ranges(self.battle, messages)
-        self.assertEqual(150, self.battle.opponent.active.speed_range.max)
-
-    def test_opponent_knocking_out_user_sets_speed_range_if_bot_used_same_priority_move(
-        self,
-    ):
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.stats[constants.SPEED] = 100
-        self.battle.user.last_selected_move = LastUsedMove("caterpie", "tackle", 0)
-
-        messages = [
-            "|move|p2a: Pikachu|Tackle|p1a: Caterpie",
-            "|-damage|p1a: Caterpie|0 fnt",
-            "|faint|p1a: Caterpie",
-            "|upkeep",
-            "|turn|7",
-        ]
-        check_speed_ranges(self.battle, messages)
-        self.assertEqual(150, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(150, self.battle.opponent.slot_a.active.speed_range.max)
 
     def test_user_knocking_out_opponent_does_nothing(
         self,
     ):
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.stats[constants.SPEED] = 100
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "tackle", 0)
 
         messages = [
@@ -3808,12 +3146,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
             "|turn|7",
         ]
         check_speed_ranges(self.battle, messages)
-        self.assertEqual(0, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_suckerpunch_and_thunderclap_sets_speed_ranges(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.stats[constants.SPEED] = 175
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.stats[constants.SPEED] = 175
 
         messages = [
             "|move|p2a: Raging Bolt|Thunderclap|p1a: Kingambit"
@@ -3830,12 +3168,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
 
         self.assertEqual(
             150,
-            self.battle.opponent.active.speed_range.min,
+            self.battle.opponent.slot_a.active.speed_range.min,
         )
 
     def test_sets_minspeed_when_opponent_goes_first(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -3845,13 +3183,13 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         self.assertEqual(
-            self.battle.user.active.stats[constants.SPEED],
-            self.battle.opponent.active.speed_range.min,
+            self.battle.user.slot_a.active.stats[constants.SPEED],
+            self.battle.opponent.slot_a.active.speed_range.min,
         )
 
     def test_sets_maxspeed_when_opponent_goes_first_in_trickroom(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.trick_room = True
 
         messages = [
@@ -3862,13 +3200,13 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         self.assertEqual(
-            self.battle.user.active.stats[constants.SPEED],
-            self.battle.opponent.active.speed_range.max,
+            self.battle.user.slot_a.active.stats[constants.SPEED],
+            self.battle.opponent.slot_a.active.speed_range.max,
         )
 
     def test_nothing_happens_with_priority_move_in_trickroom(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.trick_room = True
 
         messages = [
@@ -3878,13 +3216,15 @@ class TestCheckSpeedRanges(unittest.TestCase):
 
         check_speed_ranges(self.battle, messages)
 
-        self.assertEqual(float("inf"), self.battle.opponent.active.speed_range.max)
-        self.assertEqual(0, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(
+            float("inf"), self.battle.opponent.slot_a.active.speed_range.max
+        )
+        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_accounts_for_paralysis_when_calculating_speed_range(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.status = constants.PARALYZED
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.status = constants.PARALYZED
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -3894,16 +3234,18 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         # bot_speed * 2 should be the minspeed it has b/c it went first with paralysis
-        expected_min_speed = int(self.battle.user.active.stats[constants.SPEED] * 2)
+        expected_min_speed = int(
+            self.battle.user.slot_a.active.stats[constants.SPEED] * 2
+        )
 
         self.assertEqual(
-            expected_min_speed, self.battle.opponent.active.speed_range.min
+            expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
         )
 
     def test_accounts_for_paralysis_on_bots_side_when_calculating_speed_range(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.user.active.status = constants.PARALYZED
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.status = constants.PARALYZED
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -3913,15 +3255,17 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         # bot_speed / 2 should be the minspeed it has b/c it went first with paralysis
-        expected_min_speed = int(self.battle.user.active.stats[constants.SPEED] / 2)
+        expected_min_speed = int(
+            self.battle.user.slot_a.active.stats[constants.SPEED] / 2
+        )
 
         self.assertEqual(
-            expected_min_speed, self.battle.opponent.active.speed_range.min
+            expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
         )
 
     def test_accounts_for_tailwind_on_opponent_side_when_calculating_speed_ranges(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 300
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 300
         self.battle.opponent.side_conditions[constants.TAILWIND] = 1
 
         messages = [
@@ -3932,15 +3276,17 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         # bot_speed / 2 should be the minspeed it has b/c it went first with tailwind up
-        expected_min_speed = int(self.battle.user.active.stats[constants.SPEED] / 2)
+        expected_min_speed = int(
+            self.battle.user.slot_a.active.stats[constants.SPEED] / 2
+        )
 
         self.assertEqual(
-            expected_min_speed, self.battle.opponent.active.speed_range.min
+            expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
         )
 
     def test_accounts_for_tailwind_on_bot_side_when_calculating_speed_ranges(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 300
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 300
         self.battle.user.side_conditions[constants.TAILWIND] = 1
 
         messages = [
@@ -3951,15 +3297,17 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         # bot_speed * 2 should be the minspeed it has b/c it went first with tailwind up
-        expected_min_speed = int(self.battle.user.active.stats[constants.SPEED] * 2)
+        expected_min_speed = int(
+            self.battle.user.slot_a.active.stats[constants.SPEED] * 2
+        )
 
         self.assertEqual(
-            expected_min_speed, self.battle.opponent.active.speed_range.min
+            expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
         )
 
     def test_accounts_for_tailwind_on_both_side_when_calculating_speed_ranges(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 300
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 300
         self.battle.user.side_conditions[constants.TAILWIND] = 1
         self.battle.opponent.side_conditions[constants.TAILWIND] = 1
 
@@ -3971,20 +3319,24 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         # bot_speed / 2 should be the minspeed it has b/c it went first with tailwind up
-        expected_min_speed = int(self.battle.user.active.stats[constants.SPEED] / 2)
+        expected_min_speed = int(
+            self.battle.user.slot_a.active.stats[constants.SPEED] / 2
+        )
 
         # bot_speed * 2 should be the minspeed it has b/c it went first with tailwind up
         expected_min_speed = int(expected_min_speed * 2)
 
         self.assertEqual(
-            expected_min_speed, self.battle.opponent.active.speed_range.min
+            expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
         )
 
     def test_does_not_set_minspeed_when_opponent_could_have_unburden_activated(self):
         # opponent should have min speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.item = None
-        self.battle.opponent.active.name = "hawlucha"  # can possibly have unburden
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.item = None
+        self.battle.opponent.slot_a.active.name = (
+            "hawlucha"  # can possibly have unburden
+        )
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -3993,11 +3345,11 @@ class TestCheckSpeedRanges(unittest.TestCase):
 
         check_speed_ranges(self.battle, messages)
 
-        self.assertEqual(0, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_sets_maxspeed_when_bot_goes_first(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
         messages = [
             "|move|p1a: Caterpie|Stealth Rock|",
@@ -4007,15 +3359,15 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         self.assertEqual(
-            self.battle.user.active.stats[constants.SPEED],
-            self.battle.opponent.active.speed_range.max,
+            self.battle.user.slot_a.active.stats[constants.SPEED],
+            self.battle.opponent.slot_a.active.speed_range.max,
         )
 
     def test_minspeed_is_not_set_when_rain_is_up_and_opponent_can_have_swiftswim(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.weather = constants.RAIN
-        self.battle.opponent.active.name = "seismitoad"
+        self.battle.opponent.slot_a.active.name = "seismitoad"
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -4024,11 +3376,11 @@ class TestCheckSpeedRanges(unittest.TestCase):
 
         check_speed_ranges(self.battle, messages)
 
-        self.assertEqual(0, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_minspeed_is_set_when_only_rain_is_up(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.weather = constants.RAIN
 
         messages = [
@@ -4039,16 +3391,16 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         self.assertEqual(
-            self.battle.user.active.stats[constants.SPEED],
-            self.battle.opponent.active.speed_range.min,
+            self.battle.user.slot_a.active.stats[constants.SPEED],
+            self.battle.opponent.slot_a.active.speed_range.min,
         )
 
     def test_minspeed_is_set_when_rain_is_not_up_but_opponent_could_have_swiftswim(
         self,
     ):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.name = "seismitoad"
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.name = "seismitoad"
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -4058,14 +3410,14 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         self.assertEqual(
-            self.battle.user.active.stats[constants.SPEED],
-            self.battle.opponent.active.speed_range.min,
+            self.battle.user.slot_a.active.stats[constants.SPEED],
+            self.battle.opponent.slot_a.active.speed_range.min,
         )
 
     def test_minspeed_is_not_set_when_opponent_has_choicescarf(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.item = "choicescarf"
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.item = "choicescarf"
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -4074,12 +3426,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
 
         check_speed_ranges(self.battle, messages)
 
-        self.assertEqual(0, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_minspeed_is_correctly_set_when_bot_has_choicescarf(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.user.active.item = "choicescarf"
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.item = "choicescarf"
 
         messages = [
             "|move|p1a: Caterpie|Stealth Rock|",
@@ -4089,18 +3441,18 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         self.assertEqual(
-            self.battle.user.active.stats[constants.SPEED] * 1.5,
-            self.battle.opponent.active.speed_range.max,
+            self.battle.user.slot_a.active.stats[constants.SPEED] * 1.5,
+            self.battle.opponent.slot_a.active.speed_range.max,
         )
 
     def test_minspeed_is_correctly_set_when_bot_has_choicescarf_and_opponent_is_boosted(
         self,
     ):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 317
-        self.battle.opponent.active.stats[constants.SPEED] = 383
-        self.battle.user.active.item = "choicescarf"
-        self.battle.opponent.active.boosts[constants.SPEED] = 1
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 317
+        self.battle.opponent.slot_a.active.stats[constants.SPEED] = 383
+        self.battle.user.slot_a.active.item = "choicescarf"
+        self.battle.opponent.slot_a.active.boosts[constants.SPEED] = 1
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -4112,15 +3464,19 @@ class TestCheckSpeedRanges(unittest.TestCase):
         # this is meant to show the rounding inherent with way pokemon floors values
         # floor(317 / 1.5) = 211
         # floor(211*1.5) = 316
-        expected_speed = int(self.battle.user.active.stats[constants.SPEED] / 1.5)
+        expected_speed = int(
+            self.battle.user.slot_a.active.stats[constants.SPEED] / 1.5
+        )
         expected_speed = int(expected_speed * 1.5)
 
-        self.assertEqual(expected_speed, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(
+            expected_speed, self.battle.opponent.slot_a.active.speed_range.min
+        )
 
     def test_minspeed_interaction_with_boosted_speed(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.opponent.active.boosts[constants.SPEED] = 1
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.opponent.slot_a.active.boosts[constants.SPEED] = 1
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -4134,18 +3490,18 @@ class TestCheckSpeedRanges(unittest.TestCase):
         expected_min_speed = int(
             150
             / boost_multiplier_lookup[
-                self.battle.opponent.active.boosts[constants.SPEED]
+                self.battle.opponent.slot_a.active.boosts[constants.SPEED]
             ]
         )
 
         self.assertEqual(
-            expected_min_speed, self.battle.opponent.active.speed_range.min
+            expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
         )
 
     def test_minspeed_interaction_with_bots_boosted_speed(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.user.active.boosts[constants.SPEED] = 1
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.boosts[constants.SPEED] = 1
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -4158,21 +3514,23 @@ class TestCheckSpeedRanges(unittest.TestCase):
         # therefore, the minimum (unboosted) speed must be divided by the boost multiplier
         expected_min_speed = int(
             150
-            * boost_multiplier_lookup[self.battle.user.active.boosts[constants.SPEED]]
+            * boost_multiplier_lookup[
+                self.battle.user.slot_a.active.boosts[constants.SPEED]
+            ]
             / boost_multiplier_lookup[
-                self.battle.opponent.active.boosts[constants.SPEED]
+                self.battle.opponent.slot_a.active.boosts[constants.SPEED]
             ]
         )
 
         self.assertEqual(
-            expected_min_speed, self.battle.opponent.active.speed_range.min
+            expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
         )
 
     def test_minspeed_interaction_with_bot_and_opponents_boosted_speed(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
-        self.battle.user.active.boosts[constants.SPEED] = 1
-        self.battle.opponent.active.boosts[constants.SPEED] = 3
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.boosts[constants.SPEED] = 1
+        self.battle.opponent.slot_a.active.boosts[constants.SPEED] = 3
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -4185,19 +3543,21 @@ class TestCheckSpeedRanges(unittest.TestCase):
         # therefore, the minimum (unboosted) speed must be divided by the boost multiplier
         expected_min_speed = int(
             150
-            * boost_multiplier_lookup[self.battle.user.active.boosts[constants.SPEED]]
+            * boost_multiplier_lookup[
+                self.battle.user.slot_a.active.boosts[constants.SPEED]
+            ]
             / boost_multiplier_lookup[
-                self.battle.opponent.active.boosts[constants.SPEED]
+                self.battle.opponent.slot_a.active.boosts[constants.SPEED]
             ]
         )
 
         self.assertEqual(
-            expected_min_speed, self.battle.opponent.active.speed_range.min
+            expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
         )
 
     def test_opponents_unknown_move_is_used_as_a_zero_priority_move(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
         messages = [
             "|move|p2a: Caterpie|unknown-move|",
@@ -4206,11 +3566,11 @@ class TestCheckSpeedRanges(unittest.TestCase):
 
         check_speed_ranges(self.battle, messages)
 
-        self.assertEqual(150, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(150, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_bots_unknown_move_is_used_as_a_zero_priority_move(self):
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
         messages = [
             "|move|p1a: Caterpie|unknown-move|",
@@ -4219,7 +3579,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
 
         check_speed_ranges(self.battle, messages)
 
-        self.assertEqual(150, self.battle.opponent.active.speed_range.max)
+        self.assertEqual(150, self.battle.opponent.slot_a.active.speed_range.max)
 
     def test_opponent_has_unknown_choicescarf_causing_it_to_be_faster(self):
         # Situation:
@@ -4232,7 +3592,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
         #   the final speed
 
         # opponent should have max speed equal to the bot's speed
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
         messages = [
             "|move|p2a: Caterpie|Stealth Rock|",
@@ -4242,13 +3602,13 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
         expected_min_speed = 150
         self.assertEqual(
-            expected_min_speed, self.battle.opponent.active.speed_range.min
+            expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
         )
 
     def test_opponent_using_grassyglide_in_grassy_terrain_does_not_cause_minspeed_to_be_set(
         self,
     ):
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.field = constants.GRASSY_TERRAIN
 
         messages = [
@@ -4257,12 +3617,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         ]
 
         check_speed_ranges(self.battle, messages)
-        self.assertEqual(0, self.battle.opponent.active.speed_range.min)
+        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_bot_using_grassyglide_in_grassy_terrain_does_not_cause_maxspeed_to_be_set(
         self,
     ):
-        self.battle.user.active.stats[constants.SPEED] = 150
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.field = constants.GRASSY_TERRAIN
 
         messages = [
@@ -4271,7 +3631,9 @@ class TestCheckSpeedRanges(unittest.TestCase):
         ]
 
         check_speed_ranges(self.battle, messages)
-        self.assertEqual(float("inf"), self.battle.opponent.active.speed_range.max)
+        self.assertEqual(
+            float("inf"), self.battle.opponent.slot_a.active.speed_range.max
+        )
 
     def test_move_from_magicbounce_after_switching_does_not_set_speed_range(self):
         user_reserve_weedle = Pokemon("Weedle", 100)
@@ -4286,953 +3648,10 @@ class TestCheckSpeedRanges(unittest.TestCase):
         check_speed_ranges(self.battle, messages)
 
         # speed ranges should be unchanged because this was a switch-in
-        self.assertEqual(float("inf"), self.battle.opponent.active.speed_range.max)
-        self.assertEqual(0, self.battle.opponent.active.speed_range.min)
-
-
-class TestGuessChoiceScarf(unittest.TestCase):
-    def setUp(self):
-        self.battle = Battle(None)
-        self.battle.user.name = "p1"
-        self.battle.opponent.name = "p2"
-
-        self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
-
-        self.user_active = Pokemon("caterpie", 100)
-        self.battle.user.active = self.user_active
-
-        self.username = "CoolUsername"
-
-        self.battle.username = self.username
-
-        self.battle.request_json = {
-            constants.ACTIVE: [{constants.MOVES: []}],
-            constants.SIDE: {
-                constants.ID: None,
-                constants.NAME: None,
-                constants.POKEMON: [],
-                constants.RQID: None,
-            },
-        }
-
-    def test_fainting_pkmn_with_priority_modified_does_not_infer_scarf(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
+        self.assertEqual(
+            float("inf"), self.battle.opponent.slot_a.active.speed_range.max
         )
-        self.battle.user.active.ability = "myceliummight"
-        self.battle.user.active.name = "toedscruel"
-        self.battle.user.last_selected_move = LastUsedMove("toedscruel", "toxic", 0)
-
-        messages = [
-            "|move|p2a: Porygon2|Ice Beam|p1a: Toedscruel",
-            "|-supereffective|p1a: Toedscruel",
-            "|-damage|p1a: Toedscruel|0 fnt",
-            "|faint|p1a: Toedscruel",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_guesses_choicescarf_when_opponent_should_always_be_slower(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-
-    def test_guesses_choicescarf_when_enemy_knocks_out_user(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-        self.battle.user.last_selected_move = LastUsedMove("caterpie", "tackle", 0)
-        messages = [
-            "|move|p2a: Caterpie|Tackle| p1a: Caterpie",
-            "|-damage|p1a: Caterpie|0 fnt",
-            "|faint|p1a: Forretress",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-
-    def test_does_not_guess_choicescarf_when_user_hits_self_in_confusion(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-        self.battle.user.last_selected_move = LastUsedMove("caterpie", "tackle", 0)
-        messages = [
-            "|-activate|p1a: Caterpie|confusion",
-            "|-damage|p1a: Caterpie|15/100|[from] confusion",
-            "|move|p2a: Caterpie|Tackle| p1a: Caterpie",
-            "|-damage|p1a: Caterpie|0 fnt",
-            "|faint|p1a: Forretress",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_choicescarf_when_opponent_knocks_out_user_with_priority_move(
-        self,
-    ):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-        self.battle.user.last_selected_move = LastUsedMove("caterpie", "tackle", 0)
-        messages = [
-            "|move|p2a: Caterpie|Quick Attack| p1a: Caterpie",
-            "|-damage|p1a: Caterpie|0 fnt",
-            "|faint|p1a: Caterpie",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_choicescarf_when_user_recharged(
-        self,
-    ):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-        messages = [
-            "|cant|p1a: Caterpie|recharge",
-            "|move|p2a: Caterpie|Tackle| p1a: Caterpie",
-            "|-damage|p1a: Caterpie|0 fnt",
-            "|faint|p1a: Caterpie",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_choicescarf_when_opponent_could_have_prankster(self):
-        self.battle.opponent.active.name = "grimmsnarl"  # grimmsnarl could have prankster - it's non-damaging moves get +1 priority
-        self.battle.user.active.stats[constants.SPEED] = (
-            245  # opponent's speed should not be greater than 240 (max speed grimmsnarl)
-        )
-
-        messages = [
-            "|move|p2a: Grimmsnarl|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_choicescarf_when_opponent_is_speed_boosted(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-        self.battle.opponent.active.boosts[constants.SPEED] = 1
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_choicescarf_when_opponent_uses_grassyglide_in_grassy_terrain(
-        self,
-    ):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-        self.battle.field = constants.GRASSY_TERRAIN
-
-        messages = [
-            "|move|p2a: Caterpie|Grassy Glide|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_choicescarf_when_bot_is_speed_unboosted(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-        self.battle.user.active.boosts[constants.SPEED] = -1
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_scarf_in_trickroom(self):
-        self.battle.trick_room = True
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_scarf_under_trickroom_when_opponent_could_be_slower(self):
-        self.battle.trick_room = True
-        self.battle.user.active.stats[constants.SPEED] = (
-            205  # opponent caterpie speed is 113 - 207
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_guesses_scarf_in_trickroom_when_opponent_cannot_be_slower(self):
-        self.battle.trick_room = True
-        self.battle.user.active.stats[constants.SPEED] = (
-            110  # opponent caterpie speed is 113 - 207
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-
-    def test_unknown_moves_defaults_to_0_priority(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|unknown-move|",
-            "|move|p1a: Caterpie|unknown-move|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-
-    def test_priority_move_with_unknown_move_does_not_cause_guess(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Quick Attack|",
-            "|move|p1a: Caterpie|unknown-move|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_item_when_bot_moves_first(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-
-        messages = [
-            "|move|p1a: Caterpie|Stealth Rock|",
-            "|move|p2a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_item_when_moves_are_different_priority(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Quick Attack|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_guess_item_when_opponent_can_be_faster(self):
-        self.battle.user.active.stats[constants.SPEED] = (
-            200  # opponent's speed can be 207 (max speed caterpie)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_swiftswim_causing_opponent_to_be_faster_results_in_not_guessing_choicescarf(
-        self,
-    ):
-        self.battle.opponent.active.ability = "swiftswim"
-        self.battle.weather = constants.RAIN
-        self.battle.user.active.stats[constants.SPEED] = (
-            300  # opponent's speed can be 414 (max speed caterpie plus swiftswim)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_pokemon_possibly_having_swiftswim_in_rain_does_not_result_in_a_choicescarf_guess(
-        self,
-    ):
-        self.battle.opponent.active.name = "seismitoad"  # can have swiftswim
-        self.battle.weather = constants.RAIN
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed can be 414 (max speed caterpie plus swiftswim)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_seismitoad_choicescarf_is_guessed_when_ability_has_been_revealed(self):
-        self.battle.opponent.active.name = (
-            "seismitoad"  # set ID so lookup says it has swiftswim
-        )
-        self.battle.opponent.active.ability = "waterabsorb"  # but ability has been revealed so if it is faster a choice item should be inferred
-        self.battle.weather = constants.RAIN
-        self.battle.user.active.stats[constants.SPEED] = (
-            300  # opponent's speed can be 414 (max speed caterpie plus swiftswim). Yes it is still a caterpie
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-
-    def test_possible_surgesurfer_does_not_result_in_scarf_inferral(self):
-        self.battle.opponent.active.name = (
-            "raichualola"  # set ID so lookup says it has surgesurfer
-        )
-        self.battle.field = constants.ELECTRIC_TERRAIN
-        self.battle.user.active.stats[constants.SPEED] = (
-            300  # opponent's speed can be 414 (max speed caterpie plus swiftswim). Yes it is still a caterpie
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_surgesurfer_pokemon_choice_item_is_guessed_if_ability_is_revealed_to_be_otherwise(
-        self,
-    ):
-        self.battle.opponent.active.name = (
-            "raichualola"  # set ID so lookup says it has surgesurfer
-        )
-        self.battle.opponent.active.ability = "some_weird_ability"
-        self.battle.field = constants.ELECTRIC_TERRAIN
-        self.battle.user.active.stats[constants.SPEED] = (
-            300  # opponent's speed can be 414 (max speed caterpie plus swiftswim). Yes it is still a caterpie
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-
-    def test_pokemon_with_possible_quickfeet_does_not_have_choice_scarf_inferred(self):
-        self.battle.opponent.active.name = (
-            "ursaring"  # set ID so lookup says it has quickfeet
-        )
-        self.battle.opponent.active.status = constants.PARALYZED
-        self.battle.user.active.stats[constants.SPEED] = 210
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_pokemon_with_possible_quickfeet_does_have_choice_scarf_inferred_if_ability_revealed_to_something_else(
-        self,
-    ):
-        self.battle.opponent.active.name = (
-            "ursaring"  # set ID so lookup says it has quickfeet
-        )
-        self.battle.opponent.active.ability = (
-            "some_other_ability"  # ability cant be quickfeet
-        )
-        self.battle.opponent.active.status = constants.PARALYZED
-        self.battle.user.active.stats[constants.SPEED] = 210
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-
-    def test_does_not_guess_choicescarf_when_item_is_none(self):
-        self.battle.opponent.active.item = None
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(None, self.battle.opponent.active.item)
-
-    def test_does_not_guess_choicescarf_when_item_is_known(self):
-        self.battle.opponent.active.item = "leftovers"
-        self.battle.user.active.stats[constants.SPEED] = (
-            210  # opponent's speed should not be greater than 207 (max speed caterpie)
-        )
-
-        messages = [
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual("leftovers", self.battle.opponent.active.item)
-
-    def test_uses_randombattle_spread_when_guessing_for_randombattle(self):
-        self.battle.battle_type = constants.RANDOM_BATTLE
-
-        # opponent's speed should be 193 WITHOUT a choicescarf
-        # HOWEVER, max-speed should still outspeed this value
-        self.battle.user.active.stats[constants.SPEED] = 195
-
-        self.opponent_active = Pokemon(
-            "floetteeternal", 80
-        )  # randombattle level for Floette-E
-        self.battle.opponent.active = self.opponent_active
-
-        messages = [
-            "|move|p2a: Floette-Eternal|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual("choicescarf", self.battle.opponent.active.item)
-
-    def test_choicescarf_is_not_checked_when_switching_happens(self):
-        self.battle.user.active.stats[constants.SPEED] = 210
-        user_reserve_weedle = Pokemon("Weedle", 100)
-        user_reserve_weedle.stats[constants.SPEED] = 75
-        self.battle.user.reserve = [user_reserve_weedle]
-
-        messages = [
-            "|switch|p1a: Caterpie|Caterpie, F|255/255",
-            "|move|p2a: Caterpie|Stealth Rock|",
-            "|move|p1a: Caterpie|Stealth Rock|p2a: Caterpie|[from]ability: Magic Bounce",
-        ]
-
-        check_choicescarf(self.battle, messages)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-
-class TestCheckHeavyDutyBoots(unittest.TestCase):
-    def setUp(self):
-        self.battle = Battle(None)
-        self.battle.user.name = "p1"
-        self.battle.opponent.name = "p2"
-
-        self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
-        self.opponent_reserve_pkmn = Pokemon("weedle", 100)
-        self.battle.opponent.reserve.append(self.opponent_reserve_pkmn)
-        self.battle.opponent.active.item = constants.UNKNOWN_ITEM
-
-        self.user_active = Pokemon("caterpie", 100)
-        self.battle.user.active = self.user_active
-
-        self.user_reserve_pkmn = Pokemon("weedle", 100)
-        self.battle.user.reserve.append(self.user_reserve_pkmn)
-        self.battle.user.active.item = constants.UNKNOWN_ITEM
-
-        self.username = "CoolUsername"
-
-        self.battle.username = self.username
-        self.battle.generation = "gen9"
-
-        self.battle.request_json = {
-            constants.ACTIVE: [{constants.MOVES: []}],
-            constants.SIDE: {
-                constants.ID: None,
-                constants.NAME: None,
-                constants.POKEMON: [],
-                constants.RQID: None,
-            },
-        }
-
-    def test_basic_case_of_switching_in_and_not_taking_damage_sets_heavydutyboots(self):
-        self.battle.opponent.side_conditions[constants.STEALTH_ROCK] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|90/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("heavydutyboots", self.battle.opponent.active.item)
-
-    def test_parser_deals_with_empty_line(self):
-        self.battle.opponent.side_conditions[constants.STEALTH_ROCK] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|90/100",
-            "",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("heavydutyboots", self.battle.opponent.active.item)
-
-    def test_parser_deals_with_empty_line_with_toxicspikes(self):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Pikachu|Pikachu, M|100/100",
-            "",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Pikachu|90/100",
-            "",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("heavydutyboots", self.battle.opponent.active.item)
-
-    def test_having_an_item_bypasses_this_check(self):
-        self.battle.opponent.side_conditions[constants.STEALTH_ROCK] = 1
-        self.battle.opponent.active.item = None
-        messages = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|90/100",
-        ]
-
-        check_heavydutyboots(self.battle, messages)
-
-        self.assertEqual(None, self.battle.opponent.active.item)
-
-    def test_double_switch_where_other_side_takes_damage_does_not_set_hdb_for_the_first_side(
-        self,
-    ):
-        self.battle.opponent.side_conditions[constants.STEALTH_ROCK] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|switch|p1a: Weedle|Weedle, M|100/100",
-            "|-damage|p1a: Weedle|88/100|[from] Stealth Rock",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("heavydutyboots", self.battle.opponent.active.item)
-
-    def test_basic_case_of_switching_in_and_taking_damage_does_not_set_heavydutyboots(
-        self,
-    ):
-        self.battle.opponent.side_conditions[constants.STEALTH_ROCK] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|-damage|p2a: Weedle|88/100|[from] Stealth Rock"
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_basic_case_of_switching_in_and_taking_damage_sets_heavydutyboots_to_impossible(
-        self,
-    ):
-        self.battle.opponent.side_conditions[constants.STEALTH_ROCK] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|-damage|p2a: Weedle|88/100|[from] Stealth Rock"
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertIn(
-            constants.HEAVY_DUTY_BOOTS, self.battle.opponent.active.impossible_items
-        )
-
-    def test_not_taking_damage_from_spikes_sets_heavydutyboots(self):
-        self.battle.opponent.side_conditions[constants.SPIKES] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("heavydutyboots", self.battle.opponent.active.item)
-
-    def test_taking_damage_from_spikes_does_not_set_heavydutyboots(self):
-        self.battle.opponent.side_conditions[constants.SPIKES] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|-damage|p2a: Weedle|88/100|[from] Spikes" "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_taking_damage_from_spikes_sets_heavydutyboots_to_impossible(self):
-        self.battle.opponent.side_conditions[constants.SPIKES] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|-damage|p2a: Weedle|88/100|[from] Spikes" "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertIn(
-            constants.HEAVY_DUTY_BOOTS, self.battle.opponent.active.impossible_items
-        )
-
-    def test_not_getting_poisoned_by_toxicspikes_sets_heavydutyboots(self):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-        self.battle.opponent.active = Pokemon("pikachu", 100)
-        self.battle.msg_list = [
-            "|switch|p2a: Pikachu|Pikachu, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Pikachu|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("heavydutyboots", self.battle.opponent.active.item)
-
-    def test_not_getting_poisoned_by_toxicspikes_does_not_set_heavydutyboots_if_already_poisoned(
-        self,
-    ):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-        pikachu = Pokemon("pikachu", 100)
-        pikachu.status = constants.POISON
-        self.battle.opponent.reserve.append(pikachu)
-        self.battle.msg_list = [
-            "|switch|p2a: Pikachu|Pikachu, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Pikachu|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_infer_headydutyboots_if_levitate_is_possible_with_tspikes(self):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-        self.battle.opponent.active = Pokemon("azelf", 100)
-        self.battle.msg_list = [
-            "|switch|p2a: Azelf|Azelf, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Azelf|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_does_not_infer_headydutyboots_if_levitate_is_possible_with_spikes(self):
-        self.battle.opponent.side_conditions[constants.SPIKES] = 1
-        self.battle.opponent.active = Pokemon("azelf", 100)
-        self.battle.msg_list = [
-            "|switch|p2a: Azelf|Azelf, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Azelf|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_getting_poisoned_by_two_layers_of_toxicspikes_does_not_set_heavydutyboots(
-        self,
-    ):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-        self.battle.opponent.active = Pokemon("pikachu", 100)
-        self.battle.msg_list = [
-            "|switch|p2a: Pikachu|Pikachu, M|100/100",
-            "|-status|p2a: Pikachu|tox",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Pikachu|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_getting_toxiced_by_toxic_afterwards_still_sets_heavydutyboots(self):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-        self.battle.opponent.active = Pokemon("pikachu", 100)
-        self.battle.msg_list = [
-            "|switch|p2a: Pikachu|Pikachu, M|100/100",
-            "|move|p1a: Caterpie|Toxic",
-            "|-status|p2a: Pikachu|tox",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("heavydutyboots", self.battle.opponent.active.item)
-
-    def test_toxicorb_poisoning_at_the_end_of_the_turn_does_not_infer_heavydutyboots(
-        self,
-    ):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-        self.battle.msg_list = [
-            "|switch|p1a: Pikachu|Pikachu, M|100/100",
-            "|switch|p2a: Pikachu|Pikachu, M|100/100",
-            "|",
-            "|-status|p2a: Pikachu|tox|[from] item: Toxic Orb",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("toxicorb", self.battle.opponent.active.item)
-
-    def test_having_airballoon_does_notcause_a_heavydutyboost_inferral(self):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-
-        self.battle.msg_list = [
-            "|switch|p2a: Pikachu|Pikachu, M|100/100",
-            "|-item|p2a: Pikachu|Air Balloon",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("airballoon", self.battle.opponent.active.item)
-
-    def test_flying_type_does_not_trigger_heavydutyboots_check_on_toxicspikes(self):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-
-        self.battle.msg_list = [
-            "|switch|p2a: Pidgey|Pidgey, M|100/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_tera_flying_type_does_not_trigger_heavydutyboots_check_on_toxicspikes(
-        self,
-    ):
-        caterpie = Pokemon("caterpie", 100)
-        caterpie.types = ["normal", "water"]
-        caterpie.tera_type = "flying"
-        caterpie.terastallized = True
-        self.battle.opponent.reserve.append(caterpie)
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-
-        self.battle.msg_list = [
-            "|switch|p2a: Caterpie|Caterpie, M|100/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_tera_flying_type_does_not_trigger_heavydutyboots_check_on_spikes(
-        self,
-    ):
-        caterpie = Pokemon("caterpie", 100)
-        caterpie.types = ["normal", "water"]
-        caterpie.tera_type = "flying"
-        caterpie.terastallized = True
-        self.battle.opponent.reserve.append(caterpie)
-        self.battle.opponent.side_conditions[constants.SPIKES] = 1
-
-        self.battle.msg_list = [
-            "|switch|p2a: Caterpie|Caterpie, M|100/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_tera_steel_type_does_not_trigger_heavydutyboots_check_on_toxicspikes(self):
-        caterpie = Pokemon("caterpie", 100)
-        caterpie.types = ["normal", "water"]
-        caterpie.tera_type = "steel"
-        caterpie.terastallized = True
-        self.battle.opponent.reserve.append(caterpie)
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-
-        self.battle.msg_list = [
-            "|switch|p2a: Caterpie|Caterpie, M|100/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_getting_poisoned_by_toxicspikes_does_not_set_heavydutyboots(self):
-        self.battle.opponent.side_conditions[constants.TOXIC_SPIKES] = 1
-        self.battle.opponent.active = Pokemon("pikachu", 100)
-        self.battle.msg_list = [
-            "|switch|p2a: Pikachu|Pikachu, M|100/100",
-            "|-status|p2a: Pikachu|psn",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Pikachu|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_nothing_is_set_when_there_are_no_hazards_on_the_field(self):
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_pokemon_that_could_have_magicguard_does_not_set_heavydutyboots_when_no_damage_is_taken(
-        self,
-    ):
-        # clefable could have magicguard so HDB should not be set even though no damage was taken on switch
-        self.battle.opponent.active = Pokemon("Clefable", 100)
-        self.battle.msg_list = [
-            "|switch|p2a: Clefable|Clefable, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Clefable|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_being_caught_in_stickyweb_does_not_set_set_heavydutyboots(self):
-        self.battle.opponent.side_conditions[constants.STICKY_WEB] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|-activate|p2a: Weedle|move: Sticky Web",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual(constants.UNKNOWN_ITEM, self.battle.opponent.active.item)
-
-    def test_being_caught_in_stickyweb_sets_heavydutyboots_to_impossible(self):
-        self.battle.opponent.side_conditions[constants.STICKY_WEB] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|-activate|p2a: Weedle|move: Sticky Web",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertIn(
-            constants.HEAVY_DUTY_BOOTS, self.battle.opponent.active.impossible_items
-        )
-
-    def test_not_being_caught_in_stickyweb_sets_item_to_heavydutyboots(self):
-        self.battle.opponent.side_conditions[constants.STICKY_WEB] = 1
-        self.battle.msg_list = [
-            "|switch|p2a: Weedle|Weedle, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Weedle|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertEqual("heavydutyboots", self.battle.opponent.active.item)
-
-    def test_not_taking_spikes_with_possible_magicguard_does_not_set_heavydutyboots(
-        self,
-    ):
-        self.battle.opponent.side_conditions[constants.SPIKES] = 1
-        self.battle.opponent.reserve.append(Pokemon("Clefable", 100))
-        self.battle.msg_list = [
-            "|switch|p2a: Clefable|Clefable, M|100/100",
-            "|move|p1a: Caterpie|Tackle",
-            "|-damage|p2a: Clefable|78/100",
-        ]
-
-        process_battle_updates(self.battle)
-
-        self.assertNotEqual("heavydutyboots", self.battle.opponent.active.item)
-        self.assertNotIn("heavydutyboots", self.battle.opponent.active.impossible_items)
+        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
 
 class TestRemoveItem(unittest.TestCase):
@@ -5242,37 +3661,37 @@ class TestRemoveItem(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
         self.username = "CoolUsername"
 
         self.battle.username = self.username
 
     def test_adds_unburden_when_appropriate(self):
-        self.battle.opponent.active.name = "hawlucha"
-        self.battle.opponent.active.item = "sitrusberry"
+        self.battle.opponent.slot_a.active.name = "hawlucha"
+        self.battle.opponent.slot_a.active.item = "sitrusberry"
         split_msg = ["", "-enditem", "p2a: Hawlucha", "Sitrus Berry"]
 
         remove_item(self.battle, split_msg)
-        self.assertIn("unburden", self.battle.opponent.active.volatile_statuses)
+        self.assertIn("unburden", self.battle.opponent.slot_a.active.volatile_statuses)
 
     def test_basic_removes_item(self):
-        self.battle.opponent.active.item = "airballoon"
+        self.battle.opponent.slot_a.active.item = "airballoon"
         split_msg = ["", "-enditem", "p2a: Caterpie", "Air Balloon"]
 
         remove_item(self.battle, split_msg)
-        self.assertEqual(None, self.battle.opponent.active.item)
+        self.assertEqual(None, self.battle.opponent.slot_a.active.item)
 
     def test_sets_removed_item_when_item_ends(self):
-        self.battle.opponent.active.item = "airballoon"
+        self.battle.opponent.slot_a.active.item = "airballoon"
         split_msg = ["", "-enditem", "p2a: Caterpie", "Air Balloon"]
 
         remove_item(self.battle, split_msg)
-        self.assertEqual("airballoon", self.battle.opponent.active.removed_item)
+        self.assertEqual("airballoon", self.battle.opponent.slot_a.active.removed_item)
 
 
 class TestInactive(unittest.TestCase):
@@ -5282,11 +3701,11 @@ class TestInactive(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
 
         self.user_active = Pokemon("weedle", 100)
-        self.battle.user.active = self.user_active
+        self.battle.user.slot_a.active = self.user_active
 
         self.username = "CoolUsername"
 
@@ -5333,12 +3752,14 @@ class TestInactiveOff(unittest.TestCase):
         self.battle.opponent.name = "p2"
 
         self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.active = self.opponent_active
-        self.battle.opponent.active.ability = None
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
+        self.battle.opponent.slot_b.active = Pokemon("weedle", 100)
 
         self.user_active = Pokemon("caterpie", 100)
-        self.battle.user.active = self.user_active
-        self.battle.user.active.previous_hp = self.battle.user.active.hp
+        self.battle.user.slot_a.active = self.user_active
+        self.battle.user.slot_a.active.previous_hp = self.battle.user.slot_a.active.hp
+        self.battle.user.slot_b.active = Pokemon("weedle", 100)
 
         self.username = "CoolUsername"
 
@@ -5376,10 +3797,10 @@ class TestNoInit(unittest.TestCase):
         self.battle = Battle(None)
 
         self.battle.user.name = "p1"
-        self.battle.user.active = Pokemon("Caterpie", 100)
+        self.battle.user.slot_a.active = Pokemon("Caterpie", 100)
 
         self.battle.opponent.name = "p2"
-        self.battle.opponent.active = Pokemon("Pikachu", 100)
+        self.battle.opponent.slot_a.active = Pokemon("Pikachu", 100)
 
     def test_renames_battle_when_rename_message_occurs(self):
         self.battle.battle_tag = "original_tag"

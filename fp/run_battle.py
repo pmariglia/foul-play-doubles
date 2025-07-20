@@ -10,7 +10,7 @@ from config import FoulPlayConfig, SaveReplay
 from data.pkmn_sets import SmogonSets
 from fp.battle import LastUsedMove, Pokemon, Battle
 from fp.battle_bots.helpers import format_decision
-from fp.battle_modifier import async_update_battle, process_battle_updates
+from fp.battle_modifier import async_update_battle
 from fp.helpers import normalize_name
 
 from fp.websocket_client import PSWebsocketClient
@@ -228,7 +228,9 @@ async def start_standard_battle(
         msg = await ps_websocket_client.receive_message()
 
     opponent_showteam = [
-        l for l in msg.split("\n") if l.startswith(f"|showteam|{battle.opponent.name}")
+        line
+        for line in msg.split("\n")
+        if line.startswith(f"|showteam|{battle.opponent.name}")
     ][0][13:]
     battle.opponent.from_packed_string(opponent_showteam)
 

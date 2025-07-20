@@ -1502,8 +1502,9 @@ def swapsideconditions(battle, _):
 
 def set_item(battle, split_msg):
     """Set the opponent's item"""
-    side, _, _, _ = get_side_slot_active(battle, split_msg)
+    side, _, slot, pkmn = get_side_slot_active(battle, split_msg)
     item = normalize_name(split_msg[3].strip())
+    pkmn.item = item
 
     # if (
     #     len(split_msg) >= 5
@@ -2278,12 +2279,13 @@ def mega(battle, split_msg):
 
 
 def transform(battle, split_msg):
-    if is_opponent(battle, split_msg):
-        side = battle.opponent
-        other_side = battle.user
-    else:
-        side = battle.user
-        other_side = battle.opponent
+    ...
+    # if is_opponent(battle, split_msg):
+    #     side = battle.opponent
+    #     other_side = battle.user
+    # else:
+    #     side = battle.user
+    #     other_side = battle.opponent
 
     # transformed_into_name = other_side.active.name
     # logger.info(
@@ -2442,7 +2444,7 @@ def check_speed_ranges(battle, msg_lines):
     if number_of_moves not in [2, 3, 4]:
         return
 
-    if any(m[1][constants.ID] == "encore" for m in moves):
+    if any(m[1][constants.ID] in ["encore", "grassyglide"] for m in moves):
         return
 
     is_opp = [m[0].startswith(battle.opponent.name) for m in moves]

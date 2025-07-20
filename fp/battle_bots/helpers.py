@@ -1,9 +1,7 @@
 import logging
-from copy import deepcopy
 
 import constants
 from data import all_move_json
-from fp.battle import Pokemon, Battle
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +51,11 @@ def format_decision(battle, slot, decision):
                 decision = "1"
             elif decision == "terastarstorm" and slot.active.terastallized:
                 logger.info(
-                    "Skipping target because terastarstorm is being used while terastallized".format(
-                        decision
-                    )
+                    "Skipping target because terastarstorm is being used while terastallized".format()
                 )
             elif decision == "outrage":
                 logger.info(
-                    "Skipping target because outrage is a random target".format(
-                        decision
-                    )
+                    "Skipping target because outrage is a random target".format()
                 )
             else:
                 decision = f"{decision} {target}"

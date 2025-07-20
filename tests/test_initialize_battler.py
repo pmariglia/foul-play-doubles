@@ -47,7 +47,43 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                             "disabled": False,
                         },
                     ],
-                }
+                },
+                {
+                    "moves": [
+                        {
+                            "move": "Volt Tackle",
+                            "id": "volttackle",
+                            "pp": 32,
+                            "maxpp": 32,
+                            "target": "self",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Thunderbolt",
+                            "id": "thunderbolt",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Hidden Power Ice 60",
+                            "id": "hiddenpower",
+                            "pp": 16,
+                            "maxpp": 16,
+                            "target": "allAdjacent",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Nasty Plot",
+                            "id": "nastyplot",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                    ],
+                },
             ],
             "side": {
                 "name": "BigBluePikachu",
@@ -75,22 +111,45 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                         "item": "lightball",
                         "ability": "static",
                     },
+                    {
+                        "ident": "p2: PikachuNickname",
+                        "details": "Pikachu, L84, M",
+                        "condition": "152/335",
+                        "active": True,
+                        "stats": {
+                            "atk": 200,
+                            "def": 210,
+                            "spa": 220,
+                            "spd": 230,
+                            "spe": 240,
+                        },
+                        "moves": [
+                            "volttackle",
+                            "thunderbolt",
+                            "hiddenpowerice60",
+                            "nastyplot",
+                        ],
+                        "baseAbility": "static",
+                        "item": "lightball",
+                        "ability": "static",
+                    },
                 ],
             },
         }
-        self.battler.active = Pokemon("pikachu", 100)
+        self.battler.slot_a.active = Pokemon("pikachu", 100)
+        self.battler.slot_b.active = Pokemon("pikachu", 100)
 
         self.battler.update_from_request_json(request_dict)
 
-        self.assertEqual(self.battler.active.nickname, "PikachuNickname")
-        self.assertEqual(self.battler.active.status, None)
-        self.assertEqual(self.battler.active.level, 84)
-        self.assertEqual(self.battler.active.hp, 152)
-        self.assertEqual(self.battler.active.max_hp, 335)
-        self.assertEqual(self.battler.active.ability, "static")
-        self.assertEqual(self.battler.active.item, "lightball")
+        self.assertEqual(self.battler.slot_a.active.nickname, "PikachuNickname")
+        self.assertEqual(self.battler.slot_a.active.status, None)
+        self.assertEqual(self.battler.slot_a.active.level, 84)
+        self.assertEqual(self.battler.slot_a.active.hp, 152)
+        self.assertEqual(self.battler.slot_a.active.max_hp, 335)
+        self.assertEqual(self.battler.slot_a.active.ability, "static")
+        self.assertEqual(self.battler.slot_a.active.item, "lightball")
         self.assertEqual(
-            self.battler.active.stats,
+            self.battler.slot_a.active.stats,
             {
                 "attack": 200,
                 "defense": 210,
@@ -100,7 +159,7 @@ class TestUpdateFromRequestJson(unittest.TestCase):
             },
         )
         self.assertEqual(
-            self.battler.active.moves,
+            self.battler.slot_a.active.moves,
             [
                 Move("volttackle"),
                 Move("thunderbolt"),
@@ -147,7 +206,43 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                             "disabled": False,
                         },
                     ],
-                }
+                },
+                {
+                    "moves": [
+                        {
+                            "move": "Gigaton Hammer",
+                            "id": "gigatonhammer",
+                            "pp": 31,
+                            "maxpp": 32,
+                            "target": "self",
+                            "disabled": True,
+                        },
+                        {
+                            "move": "Thunderbolt",
+                            "id": "thunderbolt",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Hidden Power Ice 60",
+                            "id": "hiddenpower",
+                            "pp": 16,
+                            "maxpp": 16,
+                            "target": "allAdjacent",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Nasty Plot",
+                            "id": "nastyplot",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                    ],
+                },
             ],
             "side": {
                 "name": "BigBluePikachu",
@@ -175,17 +270,43 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                         "item": "lightball",
                         "ability": "static",
                     },
+                    {
+                        "ident": "p2: PikachuNickname",
+                        "details": "Pikachu, L84, M",
+                        "condition": "152/335",
+                        "active": True,
+                        "stats": {
+                            "atk": 200,
+                            "def": 210,
+                            "spa": 220,
+                            "spd": 230,
+                            "spe": 240,
+                        },
+                        "moves": [
+                            "volttackle",
+                            "thunderbolt",
+                            "hiddenpowerice60",
+                            "nastyplot",
+                        ],
+                        "baseAbility": "static",
+                        "item": "lightball",
+                        "ability": "static",
+                    },
                 ],
             },
         }
-        self.battler.active = Pokemon("pikachu", 100)
-        self.battler.last_used_move = LastUsedMove(
+        self.battler.slot_a.active = Pokemon("pikachu", 100)
+        self.battler.slot_b.active = Pokemon("pikachu", 100)
+
+        self.battler.slot_a.last_used_move = LastUsedMove(
             pokemon_name="pikachu", move="gigatonhammer", turn=0
         )
 
         self.battler.update_from_request_json(request_dict)
 
-        self.assertEqual(self.battler.active.get_move("gigatonhammer").disabled, False)
+        self.assertEqual(
+            self.battler.slot_a.active.get_move("gigatonhammer").disabled, False
+        )
 
     def test_gigatonhammer_remains_disabled_when_choice_item_selecting_another_move(
         self,
@@ -227,7 +348,43 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                             "disabled": True,
                         },
                     ],
-                }
+                },
+                {
+                    "moves": [
+                        {
+                            "move": "Gigaton Hammer",
+                            "id": "gigatonhammer",
+                            "pp": 31,
+                            "maxpp": 32,
+                            "target": "self",
+                            "disabled": True,
+                        },
+                        {
+                            "move": "Thunderbolt",
+                            "id": "thunderbolt",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Hidden Power Ice 60",
+                            "id": "hiddenpower",
+                            "pp": 16,
+                            "maxpp": 16,
+                            "target": "allAdjacent",
+                            "disabled": True,
+                        },
+                        {
+                            "move": "Nasty Plot",
+                            "id": "nastyplot",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": True,
+                        },
+                    ],
+                },
             ],
             "side": {
                 "name": "BigBluePikachu",
@@ -258,14 +415,18 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                 ],
             },
         }
-        self.battler.active = Pokemon("pikachu", 100)
+        self.battler.slot_a.active = Pokemon("pikachu", 100)
+        self.battler.slot_b.active = Pokemon("pikachu", 100)
+
         self.battler.last_used_move = LastUsedMove(
             pokemon_name="pikachu", move="thunderbolt", turn=0
         )
 
         self.battler.update_from_request_json(request_dict)
 
-        self.assertEqual(self.battler.active.get_move("gigatonhammer").disabled, True)
+        self.assertEqual(
+            self.battler.slot_a.active.get_move("gigatonhammer").disabled, True
+        )
 
     def test_sets_trapped(self):
         request_dict = {
@@ -306,7 +467,44 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                             "disabled": False,
                         },
                     ],
-                }
+                },
+                {
+                    "trapped": True,
+                    "moves": [
+                        {
+                            "move": "Volt Tackle",
+                            "id": "volttackle",
+                            "pp": 32,
+                            "maxpp": 32,
+                            "target": "self",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Thunderbolt",
+                            "id": "thunderbolt",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Hidden Power Ice 60",
+                            "id": "hiddenpower",
+                            "pp": 16,
+                            "maxpp": 16,
+                            "target": "allAdjacent",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Nasty Plot",
+                            "id": "nastyplot",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                    ],
+                },
             ],
             "side": {
                 "name": "BigBluePikachu",
@@ -334,14 +532,37 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                         "item": "lightball",
                         "ability": "static",
                     },
+                    {
+                        "ident": "p2: PikachuNickname",
+                        "details": "Pikachu, L84, M",
+                        "condition": "152/335",
+                        "active": True,
+                        "stats": {
+                            "atk": 200,
+                            "def": 210,
+                            "spa": 220,
+                            "spd": 230,
+                            "spe": 240,
+                        },
+                        "moves": [
+                            "volttackle",
+                            "thunderbolt",
+                            "hiddenpowerice60",
+                            "nastyplot",
+                        ],
+                        "baseAbility": "static",
+                        "item": "lightball",
+                        "ability": "static",
+                    },
                 ],
             },
         }
-        self.battler.active = Pokemon("pikachu", 100)
+        self.battler.slot_a.active = Pokemon("pikachu", 100)
+        self.battler.slot_b.active = Pokemon("pikachu", 100)
 
         self.battler.update_from_request_json(request_dict)
 
-        self.assertTrue(self.battler.trapped)
+        self.assertTrue(self.battler.slot_a.trapped)
 
     def test_active_optional_attributes(self):
         request_dict = {
@@ -385,7 +606,47 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                             "disabled": False,
                         },
                     ],
-                }
+                },
+                {
+                    constants.CAN_MEGA_EVO: True,
+                    constants.CAN_ULTRA_BURST: True,
+                    constants.CAN_DYNAMAX: True,
+                    constants.CAN_TERASTALLIZE: True,
+                    "moves": [
+                        {
+                            "move": "Volt Tackle",
+                            "id": "volttackle",
+                            "pp": 32,
+                            "maxpp": 32,
+                            "target": "self",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Thunderbolt",
+                            "id": "thunderbolt",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Hidden Power Ice 60",
+                            "id": "hiddenpower",
+                            "pp": 16,
+                            "maxpp": 16,
+                            "target": "allAdjacent",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Nasty Plot",
+                            "id": "nastyplot",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                    ],
+                },
             ],
             "side": {
                 "name": "BigBluePikachu",
@@ -413,17 +674,40 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                         "item": "lightball",
                         "ability": "static",
                     },
+                    {
+                        "ident": "p2: PikachuNickname",
+                        "details": "Pikachu, L84, M",
+                        "condition": "152/335",
+                        "active": True,
+                        "stats": {
+                            "atk": 200,
+                            "def": 210,
+                            "spa": 220,
+                            "spd": 230,
+                            "spe": 240,
+                        },
+                        "moves": [
+                            "volttackle",
+                            "thunderbolt",
+                            "hiddenpowerice60",
+                            "nastyplot",
+                        ],
+                        "baseAbility": "static",
+                        "item": "lightball",
+                        "ability": "static",
+                    },
                 ],
             },
         }
-        self.battler.active = Pokemon("pikachu", 100)
+        self.battler.slot_a.active = Pokemon("pikachu", 100)
+        self.battler.slot_b.active = Pokemon("pikachu", 100)
 
         self.battler.update_from_request_json(request_dict)
 
-        self.assertTrue(self.battler.active.can_mega_evo)
-        self.assertTrue(self.battler.active.can_ultra_burst)
-        self.assertTrue(self.battler.active.can_dynamax)
-        self.assertTrue(self.battler.active.can_terastallize)
+        self.assertTrue(self.battler.slot_a.active.can_mega_evo)
+        self.assertTrue(self.battler.slot_a.active.can_ultra_burst)
+        self.assertTrue(self.battler.slot_a.active.can_dynamax)
+        self.assertTrue(self.battler.slot_a.active.can_terastallize)
 
     def test_basic_updating_attributes_for_reserve_pkmn(self):
         request_dict = {
@@ -463,7 +747,43 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                             "disabled": False,
                         },
                     ],
-                }
+                },
+                {
+                    "moves": [
+                        {
+                            "move": "Volt Tackle",
+                            "id": "volttackle",
+                            "pp": 32,
+                            "maxpp": 32,
+                            "target": "self",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Thunderbolt",
+                            "id": "thunderbolt",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Hidden Power Ice 60",
+                            "id": "hiddenpower",
+                            "pp": 16,
+                            "maxpp": 16,
+                            "target": "allAdjacent",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Nasty Plot",
+                            "id": "nastyplot",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                    ],
+                },
             ],
             "side": {
                 "name": "BigBluePikachu",
@@ -516,7 +836,8 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                 ],
             },
         }
-        self.battler.active = Pokemon("pikachu", 100)
+        self.battler.slot_a.active = Pokemon("pikachu", 100)
+        self.battler.slot_b.active = Pokemon("pikachu", 100)
         rattata = Pokemon("rattata", 50)
         self.battler.reserve.append(rattata)
 
@@ -585,7 +906,43 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                             "disabled": False,
                         },
                     ],
-                }
+                },
+                {
+                    "moves": [
+                        {
+                            "move": "Volt Tackle",
+                            "id": "volttackle",
+                            "pp": 32,
+                            "maxpp": 32,
+                            "target": "self",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Thunderbolt",
+                            "id": "thunderbolt",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Hidden Power Ice 60",
+                            "id": "hiddenpower",
+                            "pp": 16,
+                            "maxpp": 16,
+                            "target": "allAdjacent",
+                            "disabled": False,
+                        },
+                        {
+                            "move": "Nasty Plot",
+                            "id": "nastyplot",
+                            "pp": 8,
+                            "maxpp": 8,
+                            "target": "normal",
+                            "disabled": False,
+                        },
+                    ],
+                },
             ],
             "side": {
                 "name": "BigBluePikachu",
@@ -638,7 +995,9 @@ class TestUpdateFromRequestJson(unittest.TestCase):
                 ],
             },
         }
-        self.battler.active = Pokemon("pikachu", 100)
+        self.battler.slot_a.active = Pokemon("pikachu", 100)
+        self.battler.slot_b.active = Pokemon("pikachu", 100)
+
         rattata = Pokemon("rattata", 100)
         tackle = Move("tackle")
         tackle.max_pp = 32
