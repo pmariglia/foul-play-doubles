@@ -2733,14 +2733,12 @@ def check_choicescarf(battle, msg_lines):
     #     battle.opponent.active.item_inferred = True
 
 
-def get_damage_dealt(battle, split_msg, next_messages):
-    move_name = normalize_name(split_msg[3])
-    critical_hit = False
-
-    attacking_side, other_side, attacking_slot, attacking_pkmn = get_side_slot_active(
-        battle, split_msg
-    )
-
+def get_single_damage_dealt(
+    battle: Battle,
+    potential_damage_dealt: DamageDealt,
+    need_to_find: str,
+    next_messages: list[str],
+) -> DamageDealt | None:
     for line in next_messages:
         next_line_split = line.split("|")
         # if one of these strings appears in index 1 then
@@ -2748,12 +2746,12 @@ def get_damage_dealt(battle, split_msg, next_messages):
         if len(next_line_split) < 2 or next_line_split[1] in MOVE_END_STRINGS:
             break
 
-        elif next_line_split[1] == "-crit":
-            critical_hit = True
+        elif next_line_split[1] == "-crit" and need_to_find in next_line_split[2]:
+            potential_damage_dealt.crit = True
 
         # if '-damage' appears, we want to parse the percentage damage dealt
         # but only if the target was the other side (i.e. don't do this for friendly fire)
-        elif next_line_split[1] == "-damage" and other_side.name in next_line_split[2]:
+        elif next_line_split[1] == "-damage" and need_to_find in next_line_split[2]:
             other_side, attacking_side, target_slot, target = get_side_slot_active(
                 battle, next_line_split
             )
@@ -2768,21 +2766,59 @@ def get_damage_dealt(battle, split_msg, next_messages):
 
             logger.info(
                 "{} did {}% damage to {} with {}".format(
-                    attacking_pkmn.name,
+                    potential_damage_dealt.attacker_slot.active.name,
                     damage_percentage * 100,
                     target.name,
-                    move_name,
+                    potential_damage_dealt.move,
                 )
             )
-            return DamageDealt(
+            potential_damage_dealt.percent_damage = damage_percentage
+            potential_damage_dealt.target_slot = target_slot
+            return potential_damage_dealt
+
+
+def get_damage_dealt(battle, split_msg, next_messages) -> list[DamageDealt | None]:
+    move_name = normalize_name(split_msg[3])
+
+    attacking_side, other_side, attacking_slot, attacking_pkmn = get_side_slot_active(
+        battle, split_msg
+    )
+
+    spread_line = [msg for msg in split_msg if msg.startswith("[spread]")]
+    if len(spread_line) == 1:
+        spread = True
+        need_to_find = spread_line[0].split(" ")[1].split(",")
+    elif len(spread_line) == 0:
+        spread = False
+        need_to_find = [split_msg[4].split(":")[0]]
+    else:
+        raise ValueError(
+            "Spread line should be 0 or 1, got {}: {}".format(
+                len(spread_line), split_msg
+            )
+        )
+
+    result = []
+    for ntf in need_to_find:
+        damage_dealt = get_single_damage_dealt(
+            battle,
+            DamageDealt(
                 attacker_side=deepcopy(attacking_side),
                 attacker_slot=deepcopy(attacking_slot),
                 target_side=deepcopy(other_side),
-                target_slot=deepcopy(target_slot),
+                target_slot=None,  # will be set later
                 move=move_name,
-                percent_damage=damage_percentage,
-                crit=critical_hit,
-            )
+                percent_damage=None,  # will be set later
+                crit=False,  # may be set later
+                spread=spread,
+            ),
+            ntf,
+            next_messages,
+        )
+        if damage_dealt is not None:
+            result.append(damage_dealt)
+
+    return result
 
 
 def _do_check(
@@ -2891,7 +2927,7 @@ def update_dataset_possibilities(
         or all_move_json[damage_dealt.move][constants.CATEGORY] == constants.STATUS
         or "multiaccuracy" in all_move_json[damage_dealt.move]
         or damage_dealt.move.startswith(constants.HIDDEN_POWER)
-        or damage_dealt.percent_damage == 0
+        or damage_dealt.percent_damage <= 0.02
         or (
             check_type == "damage_dealt"
             and damage_dealt.move
@@ -3222,13 +3258,13 @@ def process_battle_updates(battle: Battle):
 
         if action == "move" and is_opponent(battle, split_msg):
             damage_dealt = get_damage_dealt(battle, split_msg, msg_lines[i + 1 :])
-            if damage_dealt:
-                update_dataset_possibilities(battle, damage_dealt, "damage_dealt")
+            for dd in damage_dealt:
+                update_dataset_possibilities(battle, dd, "damage_dealt")
 
         elif action == "move" and not is_opponent(battle, split_msg):
             damage_dealt = get_damage_dealt(battle, split_msg, msg_lines[i + 1 :])
-            if damage_dealt:
-                update_dataset_possibilities(battle, damage_dealt, "damage_received")
+            for dd in damage_dealt:
+                update_dataset_possibilities(battle, dd, "damage_received")
 
     battle.msg_list.clear()
 

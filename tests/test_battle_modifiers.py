@@ -18,6 +18,7 @@ from fp.battle_modifier import (
     clearboost,
     remove_item,
     sidestart,
+    get_damage_dealt,
 )
 from fp.battle_modifier import terastallize
 from fp.battle_modifier import activate
@@ -1843,6 +1844,124 @@ class TestCureStatus(unittest.TestCase):
 
         self.assertEqual(0, self.opponent_reserve.sleep_turns)
         self.assertEqual(0, self.opponent_reserve.rest_turns)
+
+
+class TestGetDamageDealt(unittest.TestCase):
+    def setUp(self):
+        self.battle = Battle(None)
+        self.battle.user.name = "p1"
+        self.battle.opponent.name = "p2"
+
+        self.opponent_active = Pokemon("caterpie", 100)
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_b.active = Pokemon("torkoal", 100)
+
+        self.user_active = Pokemon("weedle", 100)
+        self.battle.user.slot_a.active = self.user_active
+        self.battle.user.slot_b.active = Pokemon("charmander", 100)
+
+    def test_gets_damage_dealt_basic_case(self):
+        self.battle.opponent.slot_a.active.hp = 100
+        self.battle.opponent.slot_a.active.max_hp = 100
+        full_message = [
+            "|move|p1b: Charmander|Tackle|p2a: Caterpie",
+            "|-damage|p2a: Caterpie|75/100",
+        ]
+        split_msg = full_message[0].split("|")
+        next_messages = full_message[1:]
+
+        damage_dealt = get_damage_dealt(self.battle, split_msg, next_messages)
+        self.assertEqual(1, len(damage_dealt))
+        self.assertEqual(0.25, damage_dealt[0].percent_damage)
+        self.assertEqual("tackle", damage_dealt[0].move)
+
+    def test_gets_damage_dealt_crit(self):
+        self.battle.opponent.slot_a.active.hp = 100
+        self.battle.opponent.slot_a.active.max_hp = 100
+        full_message = [
+            "|move|p1b: Charmander|Tackle|p2a: Caterpie",
+            "|-crit|p2a: Caterpie",
+            "|-damage|p2a: Caterpie|75/100",
+        ]
+        split_msg = full_message[0].split("|")
+        next_messages = full_message[1:]
+
+        damage_dealt = get_damage_dealt(self.battle, split_msg, next_messages)
+        self.assertEqual(1, len(damage_dealt))
+        self.assertEqual(True, damage_dealt[0].crit)
+
+    def test_no_damage_dealt(self):
+        self.battle.opponent.slot_a.active.hp = 100
+        self.battle.opponent.slot_a.active.max_hp = 100
+        full_message = [
+            "|move|p1b: Charmander|Tackle|p2a: Caterpie",
+            "|-activate|p2a: Caterpie|move: Protect",
+            "|",
+            "|upkeep",
+        ]
+        split_msg = full_message[0].split("|")
+        next_messages = full_message[1:]
+
+        damage_dealt = get_damage_dealt(self.battle, split_msg, next_messages)
+        self.assertEqual(0, len(damage_dealt))
+
+    def test_sets_spread(self):
+        # |move|p1b: Calyrex|Astral Barrage|p2a: Lunala|[spread] p2a,p2b
+        # |-supereffective|p2a: Lunala
+        # |-damage|p2a: Lunala|0 fnt
+        # |-damage|p2b: Torkoal|0 fnt
+        # |faint|p2a: Lunala
+        # |faint|p2b: Torkoal
+        full_message = [
+            "|move|p1b: Calyrex|Astral Barrage|p2a: Lunala|[spread] p2a,p2b",
+            "|-supereffective|p2a: Lunala",
+            "|-damage|p2a: Lunala|0 fnt",
+            "|-damage|p2b: Torkoal|0 fnt",
+            "|faint|p2a: Lunala",
+            "|faint|p2b: Torkoal",
+        ]
+        split_msg = full_message[0].split("|")
+        next_messages = full_message[1:]
+
+        damage_dealt = get_damage_dealt(self.battle, split_msg, next_messages)
+        self.assertEqual(2, len(damage_dealt))
+        self.assertEqual(True, damage_dealt[0].spread)
+        self.assertEqual(True, damage_dealt[1].spread)
+
+    def test_only_one_damage_dealt_when_spread_with_one_protect(self):
+        # |move|p1b: Calyrex|Astral Barrage|p2a: Lunala|[spread] p2a,p2b
+        # |-supereffective|p2a: Lunala
+        # |-damage|p2a: Lunala|0 fnt
+        # |-damage|p2b: Torkoal|0 fnt
+        # |faint|p2a: Lunala
+        # |faint|p2b: Torkoal
+        full_message = [
+            "|move|p1b: Calyrex|Astral Barrage|p2a: Lunala|[spread] p2a,p2b",
+            "|-activate|p2a: Lunala|move: Protect",
+            "|-damage|p2b: Torkoal|0 fnt",
+            "|faint|p2b: Torkoal" "|",
+            "|upkeep",
+        ]
+        split_msg = full_message[0].split("|")
+        next_messages = full_message[1:]
+
+        damage_dealt = get_damage_dealt(self.battle, split_msg, next_messages)
+        self.assertEqual(1, len(damage_dealt))
+        self.assertEqual(True, damage_dealt[0].spread)
+
+    def test_does_not_set_spread(self):
+        full_message = [
+            "|move|p1b: Calyrex|Astral Barrage|p2a: Lunala",
+            "|-supereffective|p2a: Lunala",
+            "|-damage|p2a: Lunala|0 fnt",
+            "|faint|p2a: Lunala",
+        ]
+        split_msg = full_message[0].split("|")
+        next_messages = full_message[1:]
+
+        damage_dealt = get_damage_dealt(self.battle, split_msg, next_messages)
+        self.assertEqual(1, len(damage_dealt))
+        self.assertEqual(False, damage_dealt[0].spread)
 
 
 class TestStartVolatileStatus(unittest.TestCase):

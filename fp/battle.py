@@ -822,3 +822,4 @@ class DamageDealt:
     move: str
     percent_damage: float
     crit: bool
+    spread: bool
