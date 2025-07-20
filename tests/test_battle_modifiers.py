@@ -1875,6 +1875,21 @@ class TestGetDamageDealt(unittest.TestCase):
         self.assertEqual(0.25, damage_dealt[0].percent_damage)
         self.assertEqual("tackle", damage_dealt[0].move)
 
+    def test_does_not_get_damage_dealt_for_teammate(self):
+        full_message = [
+            "|move|p1b: Calyrex|Astral Barrage|p2a: Lunala|[spread] p1a,p2b",
+            "|-supereffective|p2a: Lunala",
+            "|-damage|p1a: Lunala|0 fnt",
+            "|-damage|p2b: Torkoal|0 fnt",
+            "|faint|p1a: Lunala",
+            "|faint|p2b: Torkoal",
+        ]
+        split_msg = full_message[0].split("|")
+        next_messages = full_message[1:]
+
+        damage_dealt = get_damage_dealt(self.battle, split_msg, next_messages)
+        self.assertEqual(1, len(damage_dealt))
+
     def test_gets_damage_dealt_crit(self):
         self.battle.opponent.slot_a.active.hp = 100
         self.battle.opponent.slot_a.active.max_hp = 100

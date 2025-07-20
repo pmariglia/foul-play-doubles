@@ -2800,6 +2800,9 @@ def get_damage_dealt(battle, split_msg, next_messages) -> list[DamageDealt | Non
 
     result = []
     for ntf in need_to_find:
+        # don't get damage dealt to the attacking side
+        if ntf.startswith(attacking_side.name):
+            continue
         damage_dealt = get_single_damage_dealt(
             battle,
             DamageDealt(
