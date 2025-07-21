@@ -61,6 +61,8 @@ def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, floa
 
         assert len(battle_copy.opponent.reserve) == 2
         populate_spreads(battle_copy, i)
+        battle_copy.opponent.slot_a.lock_moves()
+        battle_copy.opponent.slot_b.lock_moves()
         battles.append((battle_copy, 1 / num_teams))
 
     return battles
