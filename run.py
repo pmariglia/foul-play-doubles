@@ -94,8 +94,6 @@ async def run_foul_play():
                 first_battle,
             )
             first_battle = False
-            if bo3_done:
-                break
             if winner == FoulPlayConfig.username:
                 best_of_3_wins += 1
                 logger.info("Won with team: {}".format(file_name))
@@ -105,6 +103,9 @@ async def run_foul_play():
 
             logger.info("This Set W: {}\tL: {}".format(best_of_3_wins, best_of_3_loss))
             check_dictionaries_are_unmodified(original_pokedex, original_move_json)
+
+            if bo3_done:
+                break
 
             if best_of_3_wins == 2 or best_of_3_loss == 2:
                 break
