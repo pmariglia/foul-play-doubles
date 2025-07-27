@@ -3,8 +3,6 @@ import random
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 
-from poke_engine import MctsResult
-
 import constants
 from data.pkmn_sets import SmogonSets
 from fp.battle import Battle, Pokemon
@@ -13,6 +11,7 @@ from config import FoulPlayConfig
 from poke_engine import (
     State as PokeEngineState,
     monte_carlo_tree_search,
+    MctsResult,
 )
 
 from ..poke_engine_helpers import battle_to_poke_engine_state
@@ -112,12 +111,9 @@ def select_move_from_mcts_results(mcts_results: list[(MctsResult, float, int)]) 
     return final_policy[0][0]
 
 
-def get_result_from_mcts(
-    poke_engine_state: PokeEngineState, search_time_ms: int, index: int
-) -> MctsResult:
-    state_string = poke_engine_state.to_string()
-    logger.debug("Calling with {} state: {}".format(index, state_string))
-
+def get_result_from_mcts(state: str, search_time_ms: int, index: int) -> MctsResult:
+    logger.debug("Calling with {} state: {}".format(index, state))
+    poke_engine_state = PokeEngineState.from_string(state)
     res = monte_carlo_tree_search(poke_engine_state, search_time_ms)
     logger.info("Iterations {}: {}".format(index, res.total_visits))
     return res
@@ -146,7 +142,7 @@ class BattleBot(Battle):
             for index, (b, chance) in enumerate(battles):
                 fut = executor.submit(
                     get_result_from_mcts,
-                    battle_to_poke_engine_state(b),
+                    battle_to_poke_engine_state(b).to_string(),
                     search_time_per_battle,
                     index,
                 )

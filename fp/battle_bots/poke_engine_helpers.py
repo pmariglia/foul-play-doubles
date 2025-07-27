@@ -12,7 +12,6 @@ from poke_engine import (
     VolatileStatusDurations as PokeEngineVolatileStatusDurations,
     Pokemon as PokeEnginePokemon,
     Move as PokeEngineMove,
-    monte_carlo_tree_search,
     calculate_damage,
 )
 
@@ -49,6 +48,10 @@ def pokemon_to_poke_engine_pkmn(pkmn: Pokemon):
         pkmn.item = "None"
 
     base_types = pokedex[str(pkmn.name)][constants.TYPES]
+    if len(base_types) == 1:
+        base_types = (base_types[0], "typeless")
+    if len(pkmn.types) == 1:
+        pkmn.types = (pkmn.types[0], "typeless")
     num_moves = len(pkmn.moves)
     if num_moves > 4:
         logger.warning(
@@ -58,15 +61,28 @@ def pokemon_to_poke_engine_pkmn(pkmn: Pokemon):
         )
         logger.warning("Truncating moves to first 4")
         pkmn.moves = pkmn.moves[:4]
-    p = PokeEnginePokemon(
+
+    pkmn_moves = [
+        PokeEngineMove(id=str(m.name), disabled=m.disabled, pp=m.current_pp)
+        for m in pkmn.moves
+    ]
+    while num_moves < 4:
+        pkmn_moves.append(PokeEngineMove(id="none", disabled=True, pp=0))
+        num_moves += 1
+
+    base_ability = ""
+    if pkmn.original_ability:
+        base_ability = str(pkmn.original_ability)
+
+    return PokeEnginePokemon(
         id=str(pkmn.name),
         level=pkmn.level,
-        types=pkmn.types,
-        base_types=base_types,
+        types=tuple(pkmn.types),
+        base_types=tuple(base_types),
         hp=int(pkmn.hp),
         maxhp=int(pkmn.max_hp),
         ability=str(pkmn.ability),
-        base_ability=pkmn.original_ability,
+        base_ability=base_ability,
         item=str(pkmn.item),
         nature=pkmn.nature,
         evs=tuple(pkmn.evs),
@@ -79,19 +95,10 @@ def pokemon_to_poke_engine_pkmn(pkmn: Pokemon):
         rest_turns=pkmn.rest_turns,
         sleep_turns=pkmn.sleep_turns,
         weight_kg=float(pokedex[pkmn.name][constants.WEIGHT]),
-        moves=[
-            PokeEngineMove(id=str(m.name), disabled=m.disabled, pp=m.current_pp)
-            for m in pkmn.moves
-        ],
+        moves=pkmn_moves,
         tera_type=pkmn.tera_type or "typeless",
         terastallized=pkmn.terastallized,
     )
-
-    while num_moves < 4:
-        p.moves.append(PokeEngineMove(id="none", disabled=True, pp=0))
-        num_moves += 1
-
-    return p
 
 
 def get_dummy_poke_engine_pkmn():
@@ -155,7 +162,7 @@ def slot_to_poke_engine_slot(
         force_switch=force_switch,
         force_trapped=slot.trapped,
         slow_uturn_move=stayed_in_on_switchout_move,
-        volatile_statuses=slot.active.volatile_statuses,
+        volatile_statuses=set(slot.active.volatile_statuses),
         volatile_status_durations=PokeEngineVolatileStatusDurations(
             confusion=slot.active.volatile_status_durations[constants.CONFUSION],
             lockedmove=slot.active.volatile_status_durations[constants.LOCKED_MOVE],
@@ -184,7 +191,7 @@ def battler_to_poke_engine_side(
     slot_a_stayed_in_on_pivot=False,
     slot_b_stayed_in_on_pivot=False,
 ):
-    side = PokeEngineSide(
+    return PokeEngineSide(
         slot_a=slot_to_poke_engine_slot(
             battler,
             battler.slot_a,
@@ -226,8 +233,6 @@ def battler_to_poke_engine_side(
             wide_guard=battler.side_conditions["wideguard"],
         ),
     )
-
-    return side
 
 
 def get_weather_string(weather):
@@ -356,7 +361,7 @@ def battle_to_poke_engine_state(battle: Battle):
         slot_b_stayed_in_on_pivot=opponent_b_stayed_in_on_pivot,
     )
 
-    state = PokeEngineState(
+    return PokeEngineState(
         side_one=side_one,
         side_two=side_two,
         weather=get_weather_string(battle.weather),
@@ -367,8 +372,6 @@ def battle_to_poke_engine_state(battle: Battle):
         trick_room_turns_remaining=battle.trick_room_turns_remaining,
         team_preview=battle.team_preview,
     )
-
-    return state
 
 
 def poke_engine_get_damage_rolls(
@@ -416,33 +419,3 @@ def poke_engine_get_damage_rolls(
     )
 
     return rolls
-
-
-def get_payoff_matrix_from_mcts(
-    poke_engine_state: PokeEngineState, search_time_ms: int
-):
-    state_string = poke_engine_state.to_string()
-    logger.debug("Calling with state: {}".format(state_string))
-
-    mcts_result = monte_carlo_tree_search(poke_engine_state, search_time_ms)
-
-    iterations = mcts_result.total_visits
-
-    most_visits = -1
-    choice = None
-    win_percentage = 0
-    for option in mcts_result.side_one:
-        visits = option.visits
-        if visits > most_visits:
-            most_visits = visits
-            win_percentage = round(float(option.total_score) / most_visits, 2)
-            choice = option.move_choice
-
-    if choice is None:
-        raise ValueError("No move found")
-
-    return (
-        choice,
-        win_percentage,
-        iterations,
-    )

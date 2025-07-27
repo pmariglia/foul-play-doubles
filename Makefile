@@ -21,4 +21,4 @@ poke_engine:
 
 # This assumes that the pmariglia/poke-engine repository is in the same directory as foul-play
 poke_engine_local:
-	pip uninstall -y poke-engine && pip install -v --force-reinstall --no-cache-dir ../poke-engine-doubles/poke-engine-py --config-settings="build-args=--features poke-engine/$(GEN) --no-default-features"
+	pip uninstall -y poke-engine-doubles && pip install -v --force-reinstall --no-cache-dir ../poke-engine-doubles/poke-engine-py --config-settings="build-args=--features poke-engine/$(GEN) --no-default-features"
