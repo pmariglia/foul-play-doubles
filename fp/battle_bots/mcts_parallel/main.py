@@ -108,7 +108,13 @@ def select_move_from_mcts_results(mcts_results: list[(MctsResult, float, int)]) 
 
     final_policy = sorted(final_policy.items(), key=lambda x: x[1], reverse=True)
     logger.info("Final policy: {}".format(final_policy))
-    return final_policy[0][0]
+
+    # Consider all moves that are close to the best move
+    highest_percentage = final_policy[0][1]
+    final_policy = [i for i in final_policy if i[1] >= highest_percentage * 0.75]
+    logger.info("Filtered policy: {}".format(final_policy))
+    choice = random.choices(final_policy, weights=[p[1] for p in final_policy])[0]
+    return choice[0]
 
 
 def get_result_from_mcts(state: str, search_time_ms: int, index: int) -> MctsResult:
