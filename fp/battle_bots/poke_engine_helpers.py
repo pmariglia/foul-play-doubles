@@ -5,6 +5,8 @@ from data import pokedex
 from fp.battle import Battle, Pokemon, Battler, Slot, LastUsedMove
 
 from poke_engine import (
+    Weather as PokeEngineWeather,
+    Terrain as PokeEngineTerrain,
     State as PokeEngineState,
     Side as PokeEngineSide,
     SideSlot as PokeEngineSideSlot,
@@ -13,9 +15,33 @@ from poke_engine import (
     Pokemon as PokeEnginePokemon,
     Move as PokeEngineMove,
     calculate_damage,
+    PokemonIndex,
 )
 
 logger = logging.getLogger(__name__)
+
+
+WEATHERS = {
+    None: PokeEngineWeather.NONE,
+    "none": PokeEngineWeather.NONE,
+    constants.SUN: PokeEngineWeather.SUN,
+    constants.RAIN: PokeEngineWeather.RAIN,
+    constants.SAND: PokeEngineWeather.SAND,
+    constants.HAIL: PokeEngineWeather.HAIL,
+    constants.SNOW: PokeEngineWeather.SNOW,
+    constants.DESOLATE_LAND: PokeEngineWeather.HARSH_SUN,
+    constants.HEAVY_RAIN: PokeEngineWeather.HEAVY_RAIN,
+}
+
+
+TERRAINS = {
+    None: PokeEngineTerrain.NONE,
+    "none": PokeEngineTerrain.NONE,
+    constants.ELECTRIC_TERRAIN: PokeEngineTerrain.ELECTRIC,
+    constants.GRASSY_TERRAIN: PokeEngineTerrain.GRASSY,
+    constants.MISTY_TERRAIN: PokeEngineTerrain.MISTY,
+    constants.PSYCHIC_TERRAIN: PokeEngineTerrain.PSYCHIC,
+}
 
 
 def status_to_string(status):
@@ -108,7 +134,7 @@ def get_dummy_poke_engine_pkmn():
 def slot_to_poke_engine_slot(
     side: Battler,
     slot: Slot,
-    active_index: str,
+    active_index: PokemonIndex,
     force_switch=False,
     stayed_in_on_switchout_move=False,
 ) -> PokeEngineSideSlot:
@@ -195,14 +221,14 @@ def battler_to_poke_engine_side(
         slot_a=slot_to_poke_engine_slot(
             battler,
             battler.slot_a,
-            active_index="0",
+            active_index=PokemonIndex.P0,
             force_switch=force_switch[0],
             stayed_in_on_switchout_move=slot_a_stayed_in_on_pivot,
         ),
         slot_b=slot_to_poke_engine_slot(
             battler,
             battler.slot_b,
-            active_index="1",
+            active_index=PokemonIndex.P1,
             force_switch=force_switch[1],
             stayed_in_on_switchout_move=slot_b_stayed_in_on_pivot,
         ),
@@ -233,46 +259,6 @@ def battler_to_poke_engine_side(
             wide_guard=battler.side_conditions["wideguard"],
         ),
     )
-
-
-def get_weather_string(weather):
-    if weather == constants.RAIN:
-        return "rain"
-    elif weather == constants.SUN:
-        return "sun"
-    elif weather == constants.SAND:
-        return "sand"
-    elif weather == constants.HAIL:
-        return "hail"
-    elif weather == constants.SNOW:
-        return "snow"
-    elif weather == constants.DESOLATE_LAND:
-        return "harshsun"
-    elif weather == constants.HEAVY_RAIN:
-        return "heavyrain"
-    elif weather is None:
-        return "none"
-    elif weather == "none":
-        return "none"
-    else:
-        raise ValueError(f"Unknown weather {weather}")
-
-
-def get_terrain_string(terrain):
-    if terrain == constants.ELECTRIC_TERRAIN:
-        return "electricterrain"
-    elif terrain == constants.GRASSY_TERRAIN:
-        return "grassyterrain"
-    elif terrain == constants.MISTY_TERRAIN:
-        return "mistyterrain"
-    elif terrain == constants.PSYCHIC_TERRAIN:
-        return "psychicterrain"
-    elif terrain is None:
-        return "none"
-    elif terrain == "none":
-        return "none"
-    else:
-        raise ValueError(f"Unknown terrain {terrain}")
 
 
 def replace_hidden_power_last_used_move(battler: Battler):
@@ -364,9 +350,9 @@ def battle_to_poke_engine_state(battle: Battle):
     return PokeEngineState(
         side_one=side_one,
         side_two=side_two,
-        weather=get_weather_string(battle.weather),
+        weather=WEATHERS[battle.weather],
         weather_turns_remaining=battle.weather_turns_remaining,
-        terrain=get_terrain_string(battle.field),
+        terrain=TERRAINS[battle.field],
         terrain_turns_remaining=battle.field_turns_remaining,
         trick_room=battle.trick_room,
         trick_room_turns_remaining=battle.trick_room_turns_remaining,
