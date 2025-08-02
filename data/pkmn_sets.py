@@ -260,6 +260,13 @@ class _SmogonSets:
         for k, v in final_infos.items():
             v[EFFECTIVENESS] = final_effectiveness.get(k, {})
 
+        for k in list(final_infos.keys()):
+            v = final_infos[k]
+            for other_forme in pokedex[k].get("otherFormes", []):
+                final_infos[normalize_name(other_forme)] = v
+            for other_forme in pokedex[k].get("cosmeticFormes", []):
+                final_infos[normalize_name(other_forme)] = v
+
         return final_infos
 
     def _get_smogon_stats_file_name(self, game_mode, month_delta=1):
