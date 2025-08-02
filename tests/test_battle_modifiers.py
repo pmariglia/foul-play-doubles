@@ -986,15 +986,47 @@ class TestActivate(unittest.TestCase):
         self.battle.user.name = "p1"
         self.battle.opponent.name = "p2"
 
-        self.user_active = Pokemon("caterpie", 100)
-        self.opponent_active = Pokemon("caterpie", 100)
+        self.user_active_a = Pokemon("caterpie", 100)
+        self.user_active_b = Pokemon("weedle", 100)
+        self.opponent_active_a = Pokemon("caterpie", 100)
+        self.opponent_active_b = Pokemon("weedle", 100)
 
         # manually set hp to 200 for testing purposes
-        self.opponent_active.max_hp = 200
-        self.opponent_active.hp = 200
+        self.opponent_active_a.max_hp = 200
+        self.opponent_active_a.hp = 200
 
-        self.battle.opponent.slot_a.active = self.opponent_active
-        self.battle.user.slot_a.active = self.user_active
+        self.battle.opponent.slot_a.active = self.opponent_active_a
+        self.battle.opponent.slot_b.active = self.opponent_active_b
+        self.battle.user.slot_a.active = self.user_active_a
+        self.battle.user.slot_b.active = self.user_active_b
+
+    def test_commander_activating_slot_b(self):
+        split_msg = [
+            "",
+            "-activate",
+            "p2b: Tatsugiri",
+            "ability: Commander",
+            "[of] p2a: Dondozo",
+        ]
+        activate(self.battle, split_msg)
+        self.assertIn(
+            "commanding", self.battle.opponent.slot_b.active.volatile_statuses
+        )
+        self.assertIn("commanded", self.battle.opponent.slot_a.active.volatile_statuses)
+
+    def test_commander_activating_slot_a(self):
+        split_msg = [
+            "",
+            "-activate",
+            "p2a: Tatsugiri",
+            "ability: Commander",
+            "[of] p2b: Dondozo",
+        ]
+        activate(self.battle, split_msg)
+        self.assertIn(
+            "commanding", self.battle.opponent.slot_a.active.volatile_statuses
+        )
+        self.assertIn("commanded", self.battle.opponent.slot_b.active.volatile_statuses)
 
     def test_activating_partially_trapped_whirlpool(self):
         split_msg = [

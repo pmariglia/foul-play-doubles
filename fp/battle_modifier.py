@@ -1009,7 +1009,7 @@ def status(battle, split_msg):
 
 
 def activate(battle, split_msg):
-    _, _, _, pkmn = get_side_slot_active(battle, split_msg)
+    side, _, slot, pkmn = get_side_slot_active(battle, split_msg)
     # if is_opponent(battle, split_msg):
     #     pkmn = battle.opponent.active
     #     other_pkmn = battle.user.active
@@ -1027,6 +1027,15 @@ def activate(battle, split_msg):
             )
         )
         pkmn.substitute_hit = True
+
+    if split_msg[3] == "ability: Commander":
+        if slot.identifier == "a":
+            ally = side.slot_b.active
+        else:
+            ally = side.slot_a.active
+        logger.info("{}'s commander activated on {}".format(pkmn.name, ally.name))
+        pkmn.volatile_statuses.append("commanding")
+        ally.volatile_statuses.append("commanded")
 
     # if split_msg[3].lower() == "move: poltergeist":
     #     item = normalize_name(split_msg[4])
