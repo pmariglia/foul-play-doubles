@@ -98,7 +98,8 @@ async def handle_team_preview(battle, ps_websocket_client):
                 p.index,
                 sum(SmogonSets.raw_pkmn_sets[p.name]["effectiveness"].values())
                 / len(SmogonSets.raw_pkmn_sets[p.name]["effectiveness"].values())
-                if len(SmogonSets.raw_pkmn_sets[p.name]["effectiveness"]) > 0
+                if p.name in SmogonSets.raw_pkmn_sets
+                and len(SmogonSets.raw_pkmn_sets[p.name]["effectiveness"]) > 0
                 else 0,
             )
             for p in battle.user.reserve

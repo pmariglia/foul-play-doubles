@@ -591,8 +591,20 @@ def heal_or_damage(battle, split_msg):
 
 
 def faint(battle, split_msg):
-    _, _, _, active = get_side_slot_active(battle, split_msg)
+    side, _, slot, active = get_side_slot_active(battle, split_msg)
     active.hp = 0
+    if active.name == "dondozo" and "commanded" in active.volatile_statuses:
+        if slot.identifier == "a":
+            ally = side.slot_b.active
+        else:
+            ally = side.slot_a.active
+        logger.info(
+            "{} fainted while commanded, removing commanding from {}".format(
+                active.name,
+                ally.name,
+            )
+        )
+        remove_volatile(ally, "commanding")
 
 
 def fail(battle, split_msg):

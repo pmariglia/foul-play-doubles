@@ -19,6 +19,7 @@ from fp.battle_modifier import (
     remove_item,
     sidestart,
     get_damage_dealt,
+    faint,
 )
 from fp.battle_modifier import terastallize
 from fp.battle_modifier import activate
@@ -2625,6 +2626,29 @@ class TestSwapSideConditions(unittest.TestCase):
         self.assertEqual(
             expected_opponent_side_conditions, self.battle.opponent.side_conditions
         )
+
+
+class TestFaint(unittest.TestCase):
+    def setUp(self):
+        self.battle = Battle(None)
+        self.battle.user.name = "p1"
+        self.battle.opponent.name = "p2"
+
+        self.opponent_active = Pokemon("caterpie", 100)
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_a.active.ability = None
+
+        self.user_active_a = Pokemon("weedle", 100)
+        self.user_active_b = Pokemon("Dondozo", 100)
+        self.battle.user.slot_a.active = self.user_active_a
+        self.battle.user.slot_b.active = self.user_active_b
+
+    def test_fainting_with_commanded_removes_commanding_from_ally(self):
+        self.battle.user.slot_a.active.volatile_statuses.append("commanding")
+        self.battle.user.slot_b.active.volatile_statuses.append("commanded")
+        split_msg = ["", "-faint", "p1b: Dondozo"]
+        faint(self.battle, split_msg)
+        self.assertNotIn("commanding", self.battle.user.slot_a.active.volatile_statuses)
 
 
 class TestFormChange(unittest.TestCase):

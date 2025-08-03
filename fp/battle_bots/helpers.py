@@ -53,12 +53,16 @@ def format_decision(battle, slot, decision):
                 logger.info(
                     "Skipping target because terastarstorm is being used while terastallized".format()
                 )
-            elif decision == "outrage":
+            elif decision == "outrage" and len(slot.active.moves) != 1:
                 logger.info(
                     "Skipping target because outrage is a random target".format()
                 )
             else:
                 decision = f"{decision} {target}"
+
+        # recharge always needs a target
+        if decision == "recharge":
+            decision = "recharge 1"
 
         message = "move {}".format(decision)
         if slot.active.can_mega_evo:
