@@ -535,6 +535,16 @@ def heal_or_damage(battle, split_msg):
     ):
         side.side_conditions[constants.TOXIC_COUNT] += 1
 
+    # needs verification: does a split_msg length of 4 _only_ happen when taking damage from a move?
+    if split_msg[1] == "-damage" and len(split_msg) == 4:
+        pkmn.times_attacked += 1
+        logger.info(split_msg)
+        logger.info(
+            "{} took regular damage, incremented times_attacked to {}".format(
+                pkmn.name, pkmn.times_attacked
+            )
+        )
+
     # commented because vgc will have revealed items
     # if (
     #     len(split_msg) == 6

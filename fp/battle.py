@@ -625,6 +625,7 @@ class Pokemon:
         self.status_at_switch_in = None
         self.terastallized = False
         self.tera_type = None
+        self.times_attacked = 0
         self.original_ability = None
         self.fainted = False
         self.reviving = False
