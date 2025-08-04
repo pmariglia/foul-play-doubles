@@ -2916,11 +2916,6 @@ def _do_check(
         )
         upper_bound_violated = actual_damage_dealt > (damage[1] * 1.025 + 2.5)
         if lower_bound_violated or upper_bound_violated:
-            logger.debug(
-                "{} is invalid based on reverse damage calc. damage_dealt={}, lower={}, upper={}".format(
-                    p, actual_damage_dealt, damage[0], damage[1]
-                )
-            )
             indicies_to_remove.append(i)
 
     if len(indicies_to_remove) == num_starting_possibilites and not allow_emptying:
