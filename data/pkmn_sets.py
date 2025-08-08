@@ -263,9 +263,11 @@ class _SmogonSets:
         for k in list(final_infos.keys()):
             v = final_infos[k]
             for other_forme in pokedex[k].get("otherFormes", []):
-                final_infos[normalize_name(other_forme)] = v
+                if normalize_name(other_forme) not in final_infos:
+                    final_infos[normalize_name(other_forme)] = v
             for other_forme in pokedex[k].get("cosmeticFormes", []):
-                final_infos[normalize_name(other_forme)] = v
+                if normalize_name(other_forme) not in final_infos:
+                    final_infos[normalize_name(other_forme)] = v
 
         return final_infos
 
