@@ -377,6 +377,18 @@ def poke_engine_get_damage_rolls(
 
     state = battle_to_poke_engine_state(battle)
 
+    logger.debug(
+        "Calling calculate damage with state: {}, attacker_side: {}, attacker_slot: {}, target_side: {}, target_slot: {}, s1_move: {}, s2_move: {}".format(
+            state.to_string(),
+            attacker_side_str,
+            attacker_slot_str,
+            target_side_str,
+            target_slot_str,
+            side_one_move,
+            side_two_move,
+        )
+    )
+
     rolls = calculate_damage(
         state,
         attacker_side_str,
@@ -385,6 +397,12 @@ def poke_engine_get_damage_rolls(
         target_slot_str,
         side_one_move,
         side_two_move,
+    )
+
+    logger.debug(
+        "Got Rolls rolls: {}".format(
+            rolls,
+        )
     )
 
     return rolls
