@@ -67,6 +67,9 @@ def pokemon_to_poke_engine_pkmn(pkmn: Pokemon):
     id,level,type0,type1,hp,maxhp,ability,item,atk,def,spa,spd,spe,atkb,defb,spab,spdb,speb,accb,evab,status,subhp,restturns
     nature,volatiles,m0,m1,m2,m3
     """
+    # the pkmn is not part of the battle, use the default empty pokemon
+    if pkmn.name == "none" and pkmn.hp == 0:
+        return PokeEnginePokemon(id="none", hp=0)
 
     # Gen 3/4 don't remove items if knocked off
     # but the item is not active, so lets remove it
@@ -126,10 +129,6 @@ def pokemon_to_poke_engine_pkmn(pkmn: Pokemon):
         terastallized=pkmn.terastallized,
         times_attacked=pkmn.times_attacked,
     )
-
-
-def get_dummy_poke_engine_pkmn():
-    return PokeEnginePokemon(id="pikachu", level=1, hp=0)
 
 
 def slot_to_poke_engine_slot(

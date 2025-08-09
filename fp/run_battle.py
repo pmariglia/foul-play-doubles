@@ -155,6 +155,7 @@ async def handle_team_preview(battle, ps_websocket_client):
         if pkmn.name not in chosen_pkmn:
             logger.info("Setting {} as fainted as it is not chosen".format(pkmn.name))
             pkmn.hp = 0
+            pkmn.name = "none"  # poke-engine uses none to identify pokemon that are not in the battle
 
     await ps_websocket_client.send_message(battle.battle_tag, message)
 
