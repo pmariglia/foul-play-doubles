@@ -1984,6 +1984,10 @@ def singleturn(battle, split_msg):
         pkmn.volatile_statuses.append(constants.ROOST)
         logger.info("{} has acquired the 'roost' volatilestatus".format(pkmn.name))
 
+    elif move_name == "helpinghand":
+        pkmn.volatile_statuses.append("helpinghand")
+        logger.info("{} gets Helping Hand".format(pkmn.name))
+
 
 def mustrecharge(battle, split_msg):
     # Bot's side does not get mustrecharge because the request JSON
@@ -2154,6 +2158,8 @@ def upkeep(battle, _):
         battle.opponent.slot_a,
         battle.opponent.slot_b,
     ]:
+        remove_volatile(slot.active, "helpinghand")
+
         if slot.active.volatile_status_durations[constants.PROTECT] > 0:
             slot.active.volatile_status_durations[constants.PROTECT] -= 1
             logger.info(

@@ -2967,6 +2967,15 @@ class TestSingleTurn(unittest.TestCase):
             ],
         )
 
+    def test_sets_helpinghand_from_singleturn(self):
+        # |-singleturn|p2b: Garchomp|Helping Hand|[of] p2a: Torkoal
+        split_msg = ["", "-singleturn", "p2a: Caterpie", "Helping Hand", "p2b: Weedle"]
+        singleturn(self.battle, split_msg)
+
+        self.assertIn(
+            "helpinghand", self.battle.opponent.slot_a.active.volatile_statuses
+        )
+
     def test_sets_protect_side_condition_when_endure_is_used(self):
         split_msg = ["", "-singleturn", "p2a: Caterpie", "Endure"]
         singleturn(self.battle, split_msg)
@@ -3059,6 +3068,14 @@ class TestUpkeep(unittest.TestCase):
         self.user_active = Pokemon("weedle", 100)
         self.battle.user.slot_a.active = self.user_active
         self.battle.user.slot_b.active = Pokemon("beedrill", 100)
+
+    def test_removes_helping_hand(self):
+        self.battle.user.slot_a.active.volatile_statuses.append("helpinghand")
+        self.assertIn("helpinghand", self.battle.user.slot_a.active.volatile_statuses)
+        upkeep(self.battle, "")
+        self.assertNotIn(
+            "helpinghand", self.battle.user.slot_a.active.volatile_statuses
+        )
 
     def test_decrements_slowstart_volatile_duration(self):
         self.battle.user.slot_a.active.volatile_statuses.append(constants.SLOW_START)
