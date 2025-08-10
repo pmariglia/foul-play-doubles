@@ -677,7 +677,7 @@ class Pokemon:
         return pkmn
 
     def has_type(self, pkmn_type: str):
-        if self.terastallized:
+        if self.terastallized and self.tera_type != "stellar":
             return pkmn_type == self.tera_type
         else:
             return pkmn_type in self.types
