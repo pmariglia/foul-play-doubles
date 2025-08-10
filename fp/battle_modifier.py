@@ -9,7 +9,7 @@ from data import pokedex
 from data.pkmn_sets import (
     SmogonSets,
 )
-from fp.battle import Pokemon, Battle
+from fp.battle import Pokemon, Battle, Slot
 from fp.battle import LastUsedMove
 from fp.battle import DamageDealt
 from fp.battle import StatRange
@@ -22,7 +22,7 @@ from fp.battle import boost_multiplier_lookup
 
 logger = logging.getLogger(__name__)
 
-MOVE_END_STRINGS = {"move", "switch", "upkeep", "-miss", ""}
+MOVE_END_STRINGS = {"move", "switch", "upkeep", ""}
 
 SIDE_CONDITION_DEFAULT_DURATION = {
     constants.REFLECT: 5,
@@ -955,6 +955,23 @@ def move(battle, split_msg):
         if "truant" not in pkmn.volatile_statuses:
             logger.info("Adding 'truant' to {}'s volatiles".format(pkmn.name))
             pkmn.volatile_statuses.append("truant")
+
+
+def check_stellar_boost(slot: Slot, damage_dealt: DamageDealt):
+    mv_dict = all_move_json.get(damage_dealt.move)
+    if (
+        mv_dict
+        and mv_dict[constants.TYPE] not in slot.active.stellar_boosted_types
+        and slot.active.terastallized
+        and slot.active.tera_type == "stellar"
+        and slot.active.name != "terapagosstellar"
+    ):
+        logger.info(
+            "{} did {} damage as stellar, adding {} to steellar_boosted_types".format(
+                slot.active.name, mv_dict[constants.TYPE], mv_dict[constants.TYPE]
+            )
+        )
+        slot.active.stellar_boosted_types.append(mv_dict[constants.TYPE])
 
 
 def setboost(battle, split_msg):
@@ -2779,6 +2796,10 @@ def get_single_damage_dealt(
         next_line_split = line.split("|")
         # if one of these strings appears in index 1 then
         # exit out since we are done with this pokemon's move
+        if next_line_split[1] == "-miss" and next_line_split[3].startswith(
+            need_to_find
+        ):
+            break
         if len(next_line_split) < 2 or next_line_split[1] in MOVE_END_STRINGS:
             break
 
@@ -3300,10 +3321,24 @@ def process_battle_updates(battle: Battle):
             for dd in damage_dealt:
                 update_dataset_possibilities(battle, dd, "damage_dealt")
 
+            if is_slot_a(split_msg):
+                attacking_slot = battle.opponent.slot_a
+            else:
+                attacking_slot = battle.opponent.slot_b
+            for dd in damage_dealt:
+                check_stellar_boost(attacking_slot, dd)
+
         elif action == "move" and not is_opponent(battle, split_msg):
             damage_dealt = get_damage_dealt(battle, split_msg, msg_lines[i + 1 :])
             for dd in damage_dealt:
                 update_dataset_possibilities(battle, dd, "damage_received")
+
+            if is_slot_a(split_msg):
+                attacking_slot = battle.user.slot_a
+            else:
+                attacking_slot = battle.user.slot_b
+            for dd in damage_dealt:
+                check_stellar_boost(attacking_slot, dd)
 
     battle.msg_list.clear()
 

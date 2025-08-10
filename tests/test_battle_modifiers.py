@@ -1977,15 +1977,24 @@ class TestGetDamageDealt(unittest.TestCase):
         self.assertEqual(True, damage_dealt[1].spread)
 
     def test_only_one_damage_dealt_when_spread_with_one_protect(self):
-        # |move|p1b: Calyrex|Astral Barrage|p2a: Lunala|[spread] p2a,p2b
-        # |-supereffective|p2a: Lunala
-        # |-damage|p2a: Lunala|0 fnt
-        # |-damage|p2b: Torkoal|0 fnt
-        # |faint|p2a: Lunala
-        # |faint|p2b: Torkoal
         full_message = [
             "|move|p1b: Calyrex|Astral Barrage|p2a: Lunala|[spread] p2a,p2b",
             "|-activate|p2a: Lunala|move: Protect",
+            "|-damage|p2b: Torkoal|0 fnt",
+            "|faint|p2b: Torkoal" "|",
+            "|upkeep",
+        ]
+        split_msg = full_message[0].split("|")
+        next_messages = full_message[1:]
+
+        damage_dealt = get_damage_dealt(self.battle, split_msg, next_messages)
+        self.assertEqual(1, len(damage_dealt))
+        self.assertEqual(True, damage_dealt[0].spread)
+
+    def test_only_one_damage_dealt_when_spread_with_one_miss(self):
+        full_message = [
+            "|move|p1b: Calyrex|Muddy Water|p2a: Lunala|[spread] p2a,p2b",
+            "|-miss|p2a: Calyrex|p2a: Lunala",
             "|-damage|p2b: Torkoal|0 fnt",
             "|faint|p2b: Torkoal" "|",
             "|upkeep",
@@ -4018,3 +4027,62 @@ class TestNoInit(unittest.TestCase):
         process_battle_updates(self.battle)
 
         self.assertEqual(self.battle.battle_tag, new_battle_tag)
+
+
+class TestSetsStellarBoost(unittest.TestCase):
+    def setUp(self):
+        self.battle = Battle(None)
+        self.battle.user.name = "p1"
+        self.battle.opponent.name = "p2"
+
+        self.opponent_active = Pokemon("caterpie", 100)
+        self.battle.opponent.slot_a.active = self.opponent_active
+        self.battle.opponent.slot_b.active = Pokemon("torkoal", 100)
+
+        self.user_active = Pokemon("weedle", 100)
+        self.battle.user.slot_a.active = self.user_active
+        self.battle.user.slot_b.active = Pokemon("charmander", 100)
+
+    def test_sets_stellar_boost_if_damage_dealt_by_terastallized_stellar_pkmn(self):
+        self.battle.opponent.slot_a.active.hp = 100
+        self.battle.opponent.slot_a.active.max_hp = 100
+        self.battle.user.slot_b.active.tera_type = "stellar"
+        self.battle.user.slot_b.active.terastallized = True
+        self.battle.msg_list = [
+            "|move|p1b: Charmander|Tackle|p2a: Caterpie",
+            "|-damage|p2a: Caterpie|75/100",
+        ]
+
+        process_battle_updates(self.battle)
+        self.assertIn("normal", self.battle.user.slot_b.active.stellar_boosted_types)
+
+    def test_sets_stellar_boost_for_opponent_if_damage_dealt_by_terastallized_stellar_pkmn(
+        self,
+    ):
+        self.battle.user.slot_a.active.hp = 100
+        self.battle.user.slot_a.active.max_hp = 100
+        self.battle.opponent.slot_b.active.tera_type = "stellar"
+        self.battle.opponent.slot_b.active.terastallized = True
+        self.battle.msg_list = [
+            "|move|p2b: Caterpie|Tackle|p1a: Charmander",
+            "|-damage|p1a: Charmander|75/100",
+        ]
+
+        process_battle_updates(self.battle)
+        self.assertIn(
+            "normal", self.battle.opponent.slot_b.active.stellar_boosted_types
+        )
+
+    def test_does_not_set_stellar_type_boost_if_terapagos_stellar(self):
+        self.battle.opponent.slot_a.active.hp = 100
+        self.battle.opponent.slot_a.active.max_hp = 100
+        self.battle.user.slot_b.active.name = "terapagosstellar"
+        self.battle.user.slot_b.active.tera_type = "stellar"
+        self.battle.user.slot_b.active.terastallized = True
+        self.battle.msg_list = [
+            "|move|p1b: Terapagos-Stellar|Tackle|p2a: Caterpie",
+            "|-damage|p2a: Caterpie|75/100",
+        ]
+
+        process_battle_updates(self.battle)
+        self.assertNotIn("normal", self.battle.user.slot_b.active.stellar_boosted_types)

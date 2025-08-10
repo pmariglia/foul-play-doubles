@@ -593,6 +593,7 @@ class Pokemon:
         self.speed_range = StatRange(min=0, max=float("inf"))
         self.hidden_power_possibilities = set(POKEMON_TYPE_INDICES.keys())
         self.revealed = False
+        self.stellar_boosted_types = []
 
         try:
             self.base_stats = pokedex[self.name][constants.BASESTATS]
