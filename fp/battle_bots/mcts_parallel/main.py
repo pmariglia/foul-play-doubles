@@ -136,11 +136,17 @@ class BattleBot(Battle):
         super(BattleBot, self).__init__(*args, **kwargs)
 
     def find_best_move(self):
-        num_teams = 8 if self.team_preview else 4
+        if self.team_preview:
+            num_teams = 8
+            parallelism = FoulPlayConfig.parallelism // 2
+            search_time_per_battle = FoulPlayConfig.search_time_ms // 2
+        else:
+            num_teams = 4
+            parallelism = FoulPlayConfig.parallelism
+            search_time_per_battle = FoulPlayConfig.search_time_ms
         battles = sample_unrevealed_pkmn(self, num_teams)
 
         num_battles = len(battles)
-        search_time_per_battle = FoulPlayConfig.search_time_ms
 
         logger.info("Searching for a move using MCTS...")
         logger.info(
@@ -149,7 +155,7 @@ class BattleBot(Battle):
             )
         )
 
-        with ProcessPoolExecutor(max_workers=FoulPlayConfig.parallelism) as executor:
+        with ProcessPoolExecutor(max_workers=parallelism) as executor:
             futures = []
             for index, (b, chance) in enumerate(battles):
                 fut = executor.submit(
