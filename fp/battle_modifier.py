@@ -2465,10 +2465,6 @@ def check_speed_ranges(battle, msg_lines):
         - Grassy Glide is used when Grassy Terrain is up
     """
     for ln in msg_lines:
-        # If either side switched this turn - don't do this check
-        if ln.startswith("|switch|"):
-            return
-
         # if anyone got `cant` or hit themselves in confusion
         # skip this check as we don't know if they used a priority move
         if ln.startswith("|cant|") or (
@@ -2490,7 +2486,11 @@ def check_speed_ranges(battle, msg_lines):
         if "quickdraw" in normalize_name(ln) or "Quick Draw" in ln:
             return
 
-    moves = [get_move_information(m) for m in msg_lines if m.startswith("|move|")]
+    moves = [
+        get_move_information(m)
+        for m in msg_lines
+        if m.startswith("|move|") and "[from]" not in m
+    ]
 
     number_of_moves = len(moves)
     if number_of_moves not in [2, 3, 4]:
@@ -2561,94 +2561,6 @@ def check_speed_ranges(battle, msg_lines):
                 update_speed_range(
                     battle, opp_pkmn, bot_pkmn, other_pkmn_faster_than=False
                 )
-    #
-    # bot_went_first = moves[0][0].startswith(battle.user.name)
-    #
-    # if (
-    #     battle.opponent.active is None
-    #     or battle.opponent.active.item == "choicescarf"
-    #     or can_have_speed_modified(battle, battle.opponent.active)
-    #     or (
-    #         not bot_went_first
-    #         and can_have_priority_modified(
-    #             battle, battle.opponent.active, moves[0][1][constants.ID]
-    #         )
-    #     )
-    #     or (
-    #         bot_went_first
-    #         and can_have_priority_modified(
-    #             battle, battle.user.active, moves[0][1][constants.ID]
-    #         )
-    #     )
-    # ):
-    #     return
-    #
-    # battle_copy = deepcopy(battle)
-    # battle_copy_for_stats = deepcopy(battle_copy)
-    # battle_copy.user.active.status = battle_copy_for_stats.user.active.stats
-    #
-    # speed_threshold = int(
-    #     boost_multiplier_lookup[battle_copy.user.active.boosts[constants.SPEED]]
-    #     * battle_copy.user.active.stats[constants.SPEED]
-    #     / boost_multiplier_lookup[battle_copy.opponent.active.boosts[constants.SPEED]]
-    # )
-    #
-    # if "protosynthesisspe" in battle.opponent.active.volatile_statuses:
-    #     speed_threshold = int(speed_threshold / 1.5)
-    #
-    # if battle.opponent.side_conditions[constants.TAILWIND]:
-    #     speed_threshold = int(speed_threshold / 2)
-    #
-    # if battle.user.side_conditions[constants.TAILWIND]:
-    #     speed_threshold = int(speed_threshold * 2)
-    #
-    # if battle.opponent.active.status == constants.PARALYZED:
-    #     if battle.generation in ["gen4", "gen5", "gen6"]:
-    #         speed_threshold = int(speed_threshold * 4)
-    #     else:
-    #         speed_threshold = int(speed_threshold * 2)
-    #
-    # if battle.user.active.status == constants.PARALYZED:
-    #     if battle.generation in ["gen4", "gen5", "gen6"]:
-    #         speed_threshold = int(speed_threshold / 4)
-    #     else:
-    #         speed_threshold = int(speed_threshold / 2)
-    #
-    # if battle.user.active.item == "choicescarf":
-    #     speed_threshold = int(speed_threshold * 1.5)
-    #
-    # if "protosynthesisspe" in battle.user.active.volatile_statuses:
-    #     speed_threshold = int(speed_threshold * 1.5)
-    #
-    # # we want to swap which attribute gets updated in trickroom because the slower pokemon goes first
-    # if battle.trick_room:
-    #     bot_went_first = not bot_went_first
-    #
-    # if bot_went_first:
-    #     opponent_max_speed = min(
-    #         battle.opponent.active.speed_range.max, speed_threshold
-    #     )
-    #     battle.opponent.active.speed_range = StatRange(
-    #         min=battle.opponent.active.speed_range.min, max=opponent_max_speed
-    #     )
-    #     logger.info(
-    #         "Updated {}'s max speed to {}".format(
-    #             battle.opponent.active.name, battle.opponent.active.speed_range.max
-    #         )
-    #     )
-    #
-    # else:
-    #     opponent_min_speed = max(
-    #         battle.opponent.active.speed_range.min, speed_threshold
-    #     )
-    #     battle.opponent.active.speed_range = StatRange(
-    #         min=opponent_min_speed, max=battle.opponent.active.speed_range.max
-    #     )
-    #     logger.info(
-    #         "Updated {}'s min speed to {}".format(
-    #             battle.opponent.active.name, battle.opponent.active.speed_range.min
-    #         )
-    #     )
 
 
 def check_opponent_hiddenpower(battle, msg_line):

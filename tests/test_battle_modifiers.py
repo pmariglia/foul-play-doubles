@@ -3241,15 +3241,21 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.name = "p1"
         self.battle.opponent.name = "p2"
 
-        self.opponent_active = Pokemon("caterpie", 100)
-        self.battle.opponent.slot_a.active = self.opponent_active
+        self.opponent_active_a = Pokemon("caterpie", 100)
+        self.battle.opponent.slot_a.active = self.opponent_active_a
         self.battle.opponent.slot_a.active.ability = None
 
-        self.user_active = Pokemon("caterpie", 100)
-        self.battle.user.slot_a.active = self.user_active
+        self.opponent_active_b = Pokemon("weedle", 100)
+        self.battle.opponent.slot_a.active = self.opponent_active_b
+        self.battle.opponent.slot_a.active.ability = None
+
+        self.user_active_a = Pokemon("caterpie", 100)
+        self.battle.user.slot_a.active = self.user_active_a
+
+        self.user_active_b = Pokemon("weedle", 100)
+        self.battle.user.slot_a.active = self.user_active_b
 
         self.username = "CoolUsername"
-
         self.battle.username = self.username
 
         self.battle.request_json = {
@@ -3261,6 +3267,23 @@ class TestCheckSpeedRanges(unittest.TestCase):
                 constants.RQID: None,
             },
         }
+
+    def test_switch_and_fakeout_still_allow_other_two_speeds_to_be_checked(self):
+        messages = [
+            # p1 switching
+            "|switch|p1b: Archaludon|Archaludon, L50, M|100/100",
+            # p2 using priority move
+            "|move|p2b: Incineroar|Fake Out|p1b: Archaludon",
+            # p1a using 0 priority move
+            "|move|p1a: Maushold|Population Bomb|p1b: Archaludon",
+            # p2a using 0 priority move means p1a should have min speed set to p2a
+            "|move|p2a: Ursaluna|Blood Moon|p1a: Maushold",
+        ]
+        self.battle.user.name = "p2"
+        self.battle.opponent.name = "p1"
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_protosynthesis_speed_is_accounted_for_in_speed_range_check(self):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 300
