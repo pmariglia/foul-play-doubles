@@ -2441,29 +2441,28 @@ def update_speed_range(
 
 def check_speed_ranges(battle, msg_lines):
     """
-    Intention:
-        This function is intended to set the min or max possible speed that the opponent's
-        active Pokemon could possibly have given a turn that just happened.
+    This function is intended to set the min or max possible speed that the opponent's
+    active Pokemon could possibly have given a turn that just happened.
 
-        For example: if both the bot and the opponent use an equal priority move but the
-        opponent moves first, then the opponent's min_speed attribute will be set to the
-        bots actual speed. This is because the opponent must have at least that much speed
-        for it to have gone first.
+    For example: if both the bot and the opponent use an equal priority move but the
+    opponent moves first, then the opponent's min_speed attribute will be set to the
+    bots actual speed. This is because the opponent must have at least that much speed
+    for it to have gone first.
 
-        These min/max speeds are set without knowledge of items. If the opponent goes first
-        when having a choice scarf then min speed will still be set to the bots speed. When
-        it comes time to guess a Pokemon's possible set(s), the item must be taken into account
-        as well when determining the final speed of a Pokemon. Abilities are NOT taken into
-        consideration because their speed modifications are subject to certain conditions
-        being present, whereas a choice scarf ALWAYS boosts speed.
+    These min/max speeds are set without knowledge of items. If the opponent goes first
+    when having a choice scarf then min speed will still be set to the bots speed. When
+    it comes time to guess a Pokemon's possible set(s), the item must be taken into account
+    as well when determining the final speed of a Pokemon. Abilities are NOT taken into
+    consideration because their speed modifications are subject to certain conditions
+    being present, whereas a choice scarf ALWAYS boosts speed.
 
-        If there is a situation where an ability could have modified the turn order (either by
-        changing a move's priority or giving a Pokemon more speed) then this check should be
-        skipped. Examples are:
-            - either side switched
-            - the opponent COULD have a speed-boosting weather ability AND that weather is up
-            - the opponent COULD have prankster and it used a status move
-            - Grassy Glide is used when Grassy Terrain is up
+    If there is a situation where an ability could have modified the turn order (either by
+    changing a move's priority or giving a Pokemon more speed) then this check should be
+    skipped. Examples are:
+        - either side switched
+        - the opponent COULD have a speed-boosting weather ability AND that weather is up
+        - the opponent COULD have prankster and it used a status move
+        - Grassy Glide is used when Grassy Terrain is up
     """
     for ln in msg_lines:
         # If either side switched this turn - don't do this check
