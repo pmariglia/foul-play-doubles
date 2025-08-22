@@ -3253,7 +3253,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active = self.user_active_a
 
         self.user_active_b = Pokemon("weedle", 100)
-        self.battle.user.slot_a.active = self.user_active_b
+        self.battle.user.slot_b.active = self.user_active_b
 
         self.username = "CoolUsername"
         self.battle.username = self.username
