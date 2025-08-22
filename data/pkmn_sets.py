@@ -11,12 +11,12 @@ from datetime import datetime
 import os
 import json
 import logging
-import typing
 from typing import Optional
 
 
 import constants
 from data import all_move_json, pokedex
+from fp.battle import Pokemon, Battler, Battle, StatRange
 from fp.helpers import calculate_stats, natures
 from fp.helpers import normalize_name
 
@@ -34,8 +34,6 @@ EFFECTIVENESS = "effectiveness"
 TEAMMATES = "teammates"
 RAW_COUNT = "raw_count"
 
-if typing.TYPE_CHECKING:
-    from fp.battle import Pokemon, Battler, Battle
 
 logger = logging.getLogger(__name__)
 PWD = os.path.dirname(os.path.abspath(__file__))
@@ -166,6 +164,7 @@ class _SmogonSets:
         self.raw_pkmn_sets = {}
         self.all_pkmn_counts = {}
         self.pkmn_sets = {}
+        self.pkmn_speed_ranges = {}
         self.pkmn_mode = "uninitialized"
 
     def _pokemon_is_similar(self, normalized_name, list_of_pkmn_names):
@@ -318,6 +317,52 @@ class _SmogonSets:
                 if self._pokemon_set_makes_sense(pkmn, pkmn_set):
                     self.pkmn_sets[pkmn_name].append(pkmn_set)
             self.pkmn_sets[pkmn_name].sort(key=lambda x: x.count, reverse=True)
+            self.pkmn_speed_ranges[pkmn_name] = StatRange(min=0, max=float("inf"))
+
+    def save_speed_ranges(self, battle: Battle):
+        for pkmn in battle.opponent.reserve + [
+            battle.opponent.slot_a.active,
+            battle.opponent.slot_b.active,
+        ]:
+            if pkmn is None:
+                continue
+            pkmn_name = normalize_name(pkmn.name)
+            if pkmn_name not in self.pkmn_speed_ranges:
+                continue
+            speed_range = self.pkmn_speed_ranges[pkmn_name]
+            if pkmn.speed_range.min > speed_range.min:
+                logger.info(
+                    "Remembering min speed for {}: {}".format(
+                        pkmn_name, pkmn.speed_range.min
+                    )
+                )
+                speed_range.min = pkmn.speed_range.min
+            if pkmn.speed_range.max < speed_range.max:
+                logger.info(
+                    "Remembering max speed for {}: {}".format(
+                        pkmn_name, pkmn.speed_range.max
+                    )
+                )
+                speed_range.max = pkmn.speed_range.max
+
+    def load_speed_ranges(self, battle: Battle):
+        for pkmn in battle.opponent.reserve + [
+            battle.opponent.slot_a.active,
+            battle.opponent.slot_b.active,
+        ]:
+            if pkmn is None:
+                continue
+            pkmn_name = normalize_name(pkmn.name)
+            if pkmn_name not in self.pkmn_speed_ranges:
+                continue
+            speed_range = self.pkmn_speed_ranges[pkmn_name]
+            pkmn.speed_range.min = speed_range.min
+            pkmn.speed_range.max = speed_range.max
+            logger.info(
+                "Remembered speed range for {}: {}-{}".format(
+                    pkmn_name, pkmn.speed_range.min, pkmn.speed_range.max
+                )
+            )
 
     def initialize(self, pkmn_mode: str, battle: Battle):
         opponent = battle.opponent

@@ -2467,9 +2467,7 @@ def check_speed_ranges(battle, msg_lines):
     for ln in msg_lines:
         # if anyone got `cant` or hit themselves in confusion
         # skip this check as we don't know if they used a priority move
-        if ln.startswith("|cant|") or (
-            ln.startswith("|-activate|") and ln.endswith("confusion")
-        ):
+        if ln.startswith("|-activate|") and ln.endswith("confusion"):
             return
 
         # If anyone used a custapberry, skip this check

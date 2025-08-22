@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 LastUsedMove = namedtuple("LastUsedMove", ["pokemon_name", "move", "turn"])
-StatRange = namedtuple("Range", ["min", "max"])
 
 
 # Based on the format, this dict controls which pokemon will be replaced during team preview
@@ -50,6 +49,12 @@ boost_multiplier_lookup = {
     5: 7 / 2,
     6: 8 / 2,
 }
+
+
+@dataclass
+class StatRange:
+    min: int | float
+    max: int | float
 
 
 class Battle:

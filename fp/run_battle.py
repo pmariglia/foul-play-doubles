@@ -221,7 +221,7 @@ async def get_first_request_json(
 async def start_standard_battle(
     ps_websocket_client: PSWebsocketClient,
     pokemon_battle_type,
-    re_initialize_smogon_sets,
+    first_battle,
 ):
     battle, msg = await start_battle_common(ps_websocket_client, pokemon_battle_type)
     battle.battle_type = constants.STANDARD_BATTLE
@@ -239,9 +239,10 @@ async def start_standard_battle(
     await get_first_request_json(ps_websocket_client, battle)
     battle.during_team_preview()
 
-    if re_initialize_smogon_sets:
+    if first_battle:
         SmogonSets.initialize(pokemon_battle_type, battle)
 
+    SmogonSets.load_speed_ranges(battle)
     battle.user.reserve.insert(0, battle.user.slot_a.active)
     battle.user.reserve.insert(0, battle.user.slot_b.active)
     battle.user.slot_a.active = None
@@ -278,6 +279,7 @@ async def pokemon_battle(
             ):
                 await ps_websocket_client.save_replay(battle.battle_tag)
             await ps_websocket_client.leave_battle(battle.battle_tag)
+            SmogonSets.save_speed_ranges(battle)
             return winner, False
         elif bo3_is_finished(best_of_3_room_name, msg):
             if constants.WIN_STRING in msg:
