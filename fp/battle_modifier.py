@@ -2857,9 +2857,9 @@ def _do_check(
 
         damage = [max_damage * 0.85, max_damage]
         lower_bound_violated = check_lower_bound and (
-            actual_damage_dealt < (damage[0] * 0.975 - 2.5)
+            actual_damage_dealt < (damage[0] * 0.975 - 1.5)
         )
-        upper_bound_violated = actual_damage_dealt > (damage[1] * 1.025 + 2.5)
+        upper_bound_violated = actual_damage_dealt > (damage[1] * 1.025 + 1.5)
         if lower_bound_violated or upper_bound_violated:
             logger.debug(
                 "{} is invalid based on reverse damage calc. damage_dealt={}, lower={}, upper={}".format(
