@@ -2655,7 +2655,7 @@ class TestFaint(unittest.TestCase):
     def test_fainting_with_commanded_removes_commanding_from_ally(self):
         self.battle.user.slot_a.active.volatile_statuses.append("commanding")
         self.battle.user.slot_b.active.volatile_statuses.append("commanded")
-        split_msg = ["", "-faint", "p1b: Dondozo"]
+        split_msg = ["", "faint", "p1b: Dondozo"]
         faint(self.battle, split_msg)
         self.assertNotIn("commanding", self.battle.user.slot_a.active.volatile_statuses)
 
@@ -3267,6 +3267,113 @@ class TestCheckSpeedRanges(unittest.TestCase):
                 constants.RQID: None,
             },
         }
+
+    def test_does_not_infer_if_bot_moved_and_then_fainted(
+        self,
+    ):
+        messages = [
+            "|move|p1a: Ursaluna|Tackle|p2a: Incineroar",
+            "|move|p2a: Incineroar|Tackle|p1a: Ursaluna",
+            "|-damage|p1a: Ursaluna|0/100 brn",
+            "|faint|p1a: Ursaluna",
+        ]
+        self.battle.turn = 1
+        self.battle.user.slot_a.last_selected_move = LastUsedMove(
+            pokemon_name="ursaluna", move="tackle", turn=1
+        )
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
+        self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.max)
+
+    def test_bots_pokemon_fainting_before_moving_sets_min_speed_on_opponents_when_priorities_are_the_same(
+        self,
+    ):
+        messages = [
+            "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
+            "|-damage|p1a: Ursaluna|0/100 brn",
+            "|faint|p1a: Ursaluna",
+        ]
+        self.battle.turn = 1
+        self.battle.user.slot_a.last_selected_move = LastUsedMove(
+            pokemon_name="ursaluna", move="tackle", turn=1
+        )
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
+
+    def test_choicescarf_impacts_speed_range(
+        self,
+    ):
+        messages = [
+            "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
+            "|-damage|p1a: Ursaluna|0/100 brn",
+            "|faint|p1a: Ursaluna",
+        ]
+        self.battle.turn = 1
+        self.battle.opponent.slot_a.active.item = "choicescarf"
+        self.battle.user.slot_a.last_selected_move = LastUsedMove(
+            pokemon_name="ursaluna", move="tackle", turn=1
+        )
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(
+            int(100 / 1.5), self.battle.opponent.slot_a.active.speed_range.min
+        )
+
+    def test_bot_fainted_can_infer_multiple_speed_ranges(
+        self,
+    ):
+        self.battle.user.slot_a.active.name = "ursaluna"
+        self.battle.opponent.slot_a.active.name = "incineroar"
+        self.battle.opponent.slot_b.active.name = "sneasler"
+        messages = [
+            "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
+            "|move|p2b: Sneasler|Dire Claw|p1b: Ursaluna",
+            "|-damage|p1a: Ursaluna|0/100 brn",
+            "|faint|p1a: Ursaluna",
+        ]
+        self.battle.turn = 1
+        self.battle.user.slot_a.last_selected_move = LastUsedMove(
+            pokemon_name="ursaluna", move="tackle", turn=1
+        )
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
+        self.assertEqual(100, self.battle.opponent.slot_b.active.speed_range.min)
+
+    def test_does_not_infer_from_faint_when_move_was_after_faint_msg(
+        self,
+    ):
+        messages = [
+            "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
+            "|-damage|p1a: Ursaluna|0/100 brn",
+            "|faint|p1a: Ursaluna",
+            "|move|p2b: Caterpie|Tackle|p1a: Weedle",
+        ]
+        self.battle.turn = 1
+        self.battle.user.slot_a.last_selected_move = LastUsedMove(
+            pokemon_name="ursaluna", move="tackle", turn=1
+        )
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
+        self.assertEqual(0, self.battle.opponent.slot_b.active.speed_range.min)
+
+    def test_does_not_infer_speed_if_fainted_after_switching(self):
+        messages = [
+            "|switch|p1a: Ursaluna|Ursaluna, L50, M|100/100",
+            "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
+            "|-damage|p1a: Ursaluna|0/100 brn",
+            "|faint|p1a: Ursaluna",
+        ]
+        self.battle.turn = 1
+        self.battle.user.slot_a.last_selected_move = LastUsedMove(
+            pokemon_name="ursaluna", move="switch ursaluna", turn=1
+        )
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(0, self.battle.opponent.slot_b.active.speed_range.min)
 
     def test_bot_side_getting_cant_can_be_used_to_infer_faster_than(self):
         messages = [

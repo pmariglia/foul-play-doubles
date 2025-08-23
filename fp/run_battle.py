@@ -53,10 +53,14 @@ async def async_pick_move(battle):
             pool, battle_copy.find_best_move
         )
     battle.user.slot_a.last_selected_move = LastUsedMove(
-        battle.user.slot_a.active.name, choice_a.removesuffix("-tera"), battle.turn
+        battle.user.slot_a.active.name,
+        choice_a.split(",")[0],
+        battle.turn,
     )
     battle.user.slot_b.last_selected_move = LastUsedMove(
-        battle.user.slot_b.active.name, choice_a.removesuffix("-tera"), battle.turn
+        battle.user.slot_b.active.name,
+        choice_b.split(",")[0],
+        battle.turn,
     )
     decision_a = format_decision(battle_copy, battle_copy.user.slot_a, choice_a)
     decision_b = format_decision(battle_copy, battle_copy.user.slot_b, choice_b)

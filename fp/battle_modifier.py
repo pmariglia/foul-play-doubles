@@ -2384,18 +2384,15 @@ def noinit(battle, split_msg):
 
 
 def update_speed_range(
-    battle, pkmn: Pokemon, other_pkmn: Pokemon, other_pkmn_faster_than=True
+    battle, opponent_pkmn: Pokemon, bot_pkmn: Pokemon, other_pkmn_faster_than=True
 ):
-    other_pkmn = deepcopy(other_pkmn)
+    bot_pkmn = deepcopy(bot_pkmn)
 
     speed_threshold = int(
-        boost_multiplier_lookup[other_pkmn.boosts[constants.SPEED]]
-        * other_pkmn.stats[constants.SPEED]
-        / boost_multiplier_lookup[pkmn.boosts[constants.SPEED]]
+        boost_multiplier_lookup[bot_pkmn.boosts[constants.SPEED]]
+        * bot_pkmn.stats[constants.SPEED]
+        / boost_multiplier_lookup[opponent_pkmn.boosts[constants.SPEED]]
     )
-
-    if "protosynthesisspe" in pkmn.volatile_statuses:
-        speed_threshold = int(speed_threshold / 1.5)
 
     if battle.opponent.side_conditions[constants.TAILWIND]:
         speed_threshold = int(speed_threshold / 2)
@@ -2403,16 +2400,22 @@ def update_speed_range(
     if battle.user.side_conditions[constants.TAILWIND]:
         speed_threshold = int(speed_threshold * 2)
 
-    if pkmn.status == constants.PARALYZED:
+    if opponent_pkmn.status == constants.PARALYZED:
         speed_threshold = int(speed_threshold * 2)
 
-    if other_pkmn.status == constants.PARALYZED:
+    if bot_pkmn.status == constants.PARALYZED:
         speed_threshold = int(speed_threshold / 2)
 
-    if other_pkmn.item == "choicescarf":
+    if opponent_pkmn.item == "choicescarf":
+        speed_threshold = int(speed_threshold / 1.5)
+
+    if bot_pkmn.item == "choicescarf":
         speed_threshold = int(speed_threshold * 1.5)
 
-    if "protosynthesisspe" in other_pkmn.volatile_statuses:
+    if "protosynthesisspe" in opponent_pkmn.volatile_statuses:
+        speed_threshold = int(speed_threshold / 1.5)
+
+    if "protosynthesisspe" in bot_pkmn.volatile_statuses:
         speed_threshold = int(speed_threshold * 1.5)
 
     if battle.trick_room:
@@ -2421,22 +2424,28 @@ def update_speed_range(
         other_pkmn_went_first = other_pkmn_faster_than
 
     if other_pkmn_went_first:
-        opponent_max_speed = min(pkmn.speed_range.max, speed_threshold)
-        pkmn.speed_range = StatRange(min=pkmn.speed_range.min, max=opponent_max_speed)
-        logger.info(
-            "Updated {}'s max speed to {}'s {}".format(
-                pkmn.name, other_pkmn.name, pkmn.speed_range.max
+        opponent_max_speed = min(opponent_pkmn.speed_range.max, speed_threshold)
+        if opponent_max_speed != opponent_pkmn.speed_range.max:
+            opponent_pkmn.speed_range = StatRange(
+                min=opponent_pkmn.speed_range.min, max=opponent_max_speed
             )
-        )
+            logger.info(
+                "Updated {}'s max speed to {}".format(
+                    opponent_pkmn.name, opponent_pkmn.speed_range.max
+                )
+            )
 
     else:
-        opponent_min_speed = max(pkmn.speed_range.min, speed_threshold)
-        pkmn.speed_range = StatRange(min=opponent_min_speed, max=pkmn.speed_range.max)
-        logger.info(
-            "Updated {}'s min speed to {}'s {}".format(
-                pkmn.name, other_pkmn.name, pkmn.speed_range.min
+        opponent_min_speed = max(opponent_pkmn.speed_range.min, speed_threshold)
+        if opponent_min_speed != opponent_pkmn.speed_range.min:
+            opponent_pkmn.speed_range = StatRange(
+                min=opponent_min_speed, max=opponent_pkmn.speed_range.max
             )
-        )
+            logger.info(
+                "Updated {}'s min speed to {}".format(
+                    opponent_pkmn.name, opponent_pkmn.speed_range.min
+                )
+            )
 
 
 def check_speed_ranges(battle, msg_lines):
@@ -2517,10 +2526,8 @@ def check_speed_ranges(battle, msg_lines):
     ]
 
     number_of_moves = len(moves)
-    if number_of_moves not in [2, 3, 4]:
-        return
 
-    if any(m[1][constants.ID] in ["encore", "grassyglide"] for m in moves):
+    if any(m[1][constants.ID] in ["encore", "grassyglide", "tailwind"] for m in moves):
         return
 
     is_opp = [m[0].startswith(battle.opponent.name) for m in moves]
@@ -2585,6 +2592,73 @@ def check_speed_ranges(battle, msg_lines):
                 update_speed_range(
                     battle, opp_pkmn, bot_pkmn, other_pkmn_faster_than=False
                 )
+
+    bot_side_fainted = [
+        (i, m)
+        for (i, m) in enumerate(msg_lines)
+        if (m.startswith(f"|faint|{battle.user.name}"))
+    ]
+    for i, faint_msg in bot_side_fainted:
+        slot_letter = faint_msg.split("|")[2][2]
+        # check for switch or drag on the same slot, if so skip
+        if any(
+            m
+            for m in msg_lines
+            if (
+                m.startswith(f"|switch|{battle.user.name}{slot_letter}")
+                or m.startswith(f"|drag|{battle.user.name}{slot_letter}")
+                or m.startswith(f"|move|{battle.user.name}{slot_letter}")
+            )
+        ):
+            continue
+        # get last selected move for the slot
+        if slot_letter == "a":
+            last_move = battle.user.slot_a.last_selected_move
+            pkmn = battle.user.slot_a.active
+        else:
+            last_move = battle.user.slot_b.last_selected_move
+            pkmn = battle.user.slot_b.active
+
+        # skip if the last move was a switch or not on this turn
+        if (
+            last_move.move.startswith("switch")
+            or last_move.turn != battle.turn
+            or last_move.move not in all_move_json
+        ):
+            continue
+
+        # if the last selected move was on this turn, we can use it to update speed ranges
+        last_move_dict = all_move_json[last_move.move]
+        if last_move.turn == battle.turn:
+            # find all opponent moves with the same priority that happened before this faint
+            moves = [
+                get_move_information(m)
+                for (ii, m) in enumerate(msg_lines)
+                if (m.startswith("|move|") and "[from]" not in m) and ii < i
+            ]
+            same_priority_moves = [
+                m
+                for m in moves
+                if (
+                    not m[0].startswith(battle.user.name)
+                    and m[1][constants.PRIORITY] == last_move_dict[constants.PRIORITY]
+                )
+            ]
+
+            for opp_pkmn, opp_pkmn_used_move in same_priority_moves:
+                if not can_have_priority_modified(
+                    battle, pkmn, opp_pkmn_used_move[constants.ID]
+                ):
+                    _, _, _, opp_pkmn = get_side_slot_active(
+                        battle, [None, None, opp_pkmn]
+                    )
+                    logger.info(
+                        f"Bot's {pkmn.name} fainted before it could use {last_move.move}, "
+                        + f"{opp_pkmn.name} using {opp_pkmn_used_move[constants.NAME]} must be at least as fast"
+                    )
+                    update_speed_range(
+                        battle, opp_pkmn, pkmn, other_pkmn_faster_than=False
+                    )
 
 
 def check_opponent_hiddenpower(battle, msg_line):
