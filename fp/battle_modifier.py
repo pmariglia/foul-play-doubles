@@ -2484,10 +2484,36 @@ def check_speed_ranges(battle, msg_lines):
         if "quickdraw" in normalize_name(ln) or "Quick Draw" in ln:
             return
 
+    actionable = [
+        m
+        for m in msg_lines
+        if (m.startswith("|move|") and "[from]" not in m) or m.startswith("|cant|")
+    ]
+
+    # replace `cant` with `move` if the bot's side got `cant`
+    # only for the bot's side because we know what move we just selected
+    for i, m in enumerate(actionable):
+        if m.startswith(f"|cant|{battle.user.name}a"):
+            if battle.user.slot_a.last_selected_move.turn == battle.turn:
+                actionable[i] = (
+                    f"|move|{battle.user.name}a: {battle.user.slot_a.active.name}|{battle.user.slot_a.last_selected_move.move}"
+                )
+                logger.info(
+                    f"Replaced cant for {battle.user.slot_a.active.name} with last selected move: {actionable[i]}"
+                )
+        elif m.startswith(f"|cant|{battle.user.name}b"):
+            if battle.user.slot_b.last_selected_move.turn == battle.turn:
+                actionable[i] = (
+                    f"|move|{battle.user.name}b: {battle.user.slot_b.active.name}|{battle.user.slot_b.last_selected_move.move}"
+                )
+                logger.info(
+                    f"Replaced cant for {battle.user.slot_b.active.name} with last selected move: {actionable[i]}"
+                )
+
     moves = [
         get_move_information(m)
-        for m in msg_lines
-        if m.startswith("|move|") and "[from]" not in m
+        for m in actionable
+        if (m.startswith("|move|") and "[from]" not in m)
     ]
 
     number_of_moves = len(moves)

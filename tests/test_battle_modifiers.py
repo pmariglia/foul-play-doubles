@@ -3246,8 +3246,8 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.opponent.slot_a.active.ability = None
 
         self.opponent_active_b = Pokemon("weedle", 100)
-        self.battle.opponent.slot_a.active = self.opponent_active_b
-        self.battle.opponent.slot_a.active.ability = None
+        self.battle.opponent.slot_b.active = self.opponent_active_b
+        self.battle.opponent.slot_b.active.ability = None
 
         self.user_active_a = Pokemon("caterpie", 100)
         self.battle.user.slot_a.active = self.user_active_a
@@ -3267,6 +3267,68 @@ class TestCheckSpeedRanges(unittest.TestCase):
                 constants.RQID: None,
             },
         }
+
+    def test_bot_side_getting_cant_can_be_used_to_infer_faster_than(self):
+        messages = [
+            "|move|p2a: Incineroar|Fake Out|p1b: Ursaluna",
+            "|-damage|p1a: Ursaluna|82/100 brn",
+            # The order of the next two reveals speed ranges
+            # p2a is faster than p1b
+            "|move|p2b: Archaludon|Tackle|p1a: Ursaluna",
+            "|cant|p1a: Ursaluna|flinch",
+        ]
+        self.battle.turn = 1
+        self.battle.user.slot_a.last_selected_move = LastUsedMove(
+            pokemon_name="ursaluna", move="tackle", turn=1
+        )
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(100, self.battle.opponent.slot_b.active.speed_range.min)
+
+    def test_bot_using_priority_move_but_getting_flinched(self):
+        messages = [
+            "|move|p2a: Incineroar|Fake Out|p1b: Ursaluna",
+            "|-damage|p1a: Ursaluna|82/100 brn",
+            "|cant|p1a: Ursaluna|flinch",  # this was trying to use fakeout, meaning p2a is faster than p1a
+            "|move|p2a: Archaludon|Tackle|p1a: Ursaluna",
+        ]
+        self.battle.turn = 1
+        self.battle.user.slot_a.last_selected_move = LastUsedMove(
+            pokemon_name="ursaluna", move="fakeout", turn=1
+        )
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
+
+    def test_bot_side_getting_cant_can_be_used_to_infer_slower_than(self):
+        messages = [
+            "|move|p2a: Incineroar|Fake Out|p1b: Ursaluna",
+            "|-damage|p1a: Ursaluna|82/100 brn",
+            "|cant|p1a: Ursaluna|flinch",  # this was trying to use tackle, meaning p1a is faster than p2b
+            "|move|p2b: Archaludon|Tackle|p1a: Ursaluna",
+        ]
+        self.battle.turn = 1
+        self.battle.user.slot_a.last_selected_move = LastUsedMove(
+            pokemon_name="ursaluna", move="tackle", turn=1
+        )
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(100, self.battle.opponent.slot_b.active.speed_range.max)
+
+    def test_opponent_side_getting_cant_does_not_reveal_speed_range(self):
+        messages = [
+            "|move|p1a: Incineroar|Fake Out|p2b: Ursaluna",
+            "|-damage|p2a: Ursaluna|82/100 brn",
+            "|cant|p2a: Ursaluna|flinch",  # we can't infer anything here, because we don't know what move the opponent was trying to use
+            "|move|p1b: Archaludon|Tackle|p2a: Ursaluna",
+        ]
+        self.battle.turn = 1
+        self.battle.user.slot_a.active.stats[constants.SPEED] = 100
+        check_speed_ranges(self.battle, messages)
+        self.assertEqual(
+            float("inf"), self.battle.opponent.slot_b.active.speed_range.max
+        )
+        self.assertEqual(0, self.battle.opponent.slot_b.active.speed_range.min)
 
     def test_switch_and_fakeout_still_allow_other_two_speeds_to_be_checked(self):
         messages = [
