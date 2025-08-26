@@ -43,10 +43,7 @@ def sample_pkmn_to_remove(pkmn_list: list[Pokemon]):
 
 def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, float)]:
     battle = deepcopy(battle)
-    if battle.team_preview:
-        num_reserves = NUM_RESERVES + 2
-    else:
-        num_reserves = NUM_RESERVES
+    num_reserves = NUM_RESERVES
 
     battles = []
     for i in range(num_teams):
@@ -55,15 +52,31 @@ def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, floa
             pkmn = sample_pkmn_to_remove(battle_copy.opponent.reserve)
             battle_copy.opponent.reserve.remove(pkmn)
 
-        if battle_copy.team_preview:
-            team_preview_shuffle(battle_copy)
-
         assert len(battle_copy.opponent.reserve) == 2
         populate_spreads(battle_copy, i)
         battle_copy.opponent.slot_a.lock_moves()
         battle_copy.opponent.slot_b.lock_moves()
         battles.append((battle_copy, 1 / num_teams))
 
+    return battles
+
+
+def get_battles_for_team_preview(battle: Battle) -> list[Battle]:
+    # for all 6 pkmn in the opponent's reserve, create a battle of 4 pkmn
+    # get all 15 combinations of 4 pkmn from the 6
+    from itertools import combinations
+
+    battles = []
+    i = 0
+    for reserve_comb in combinations(battle.opponent.reserve, 4):
+        battle_copy = deepcopy(battle)
+        battle_copy.opponent.reserve = deepcopy(list(reserve_comb))
+        team_preview_shuffle(battle_copy)
+        populate_spreads(battle_copy, i)
+        battle_copy.opponent.slot_a.lock_moves()
+        battle_copy.opponent.slot_b.lock_moves()
+        battles.append((battle_copy, 1 / 15))
+        i += 1
     return battles
 
 
@@ -137,14 +150,14 @@ class BattleBot(Battle):
 
     def find_best_move(self):
         if self.team_preview:
-            num_teams = 8
-            parallelism = FoulPlayConfig.parallelism // 2
+            battles = get_battles_for_team_preview(self)
+            parallelism = FoulPlayConfig.parallelism
             search_time_per_battle = FoulPlayConfig.search_time_ms // 2
         else:
             num_teams = 4
             parallelism = FoulPlayConfig.parallelism
             search_time_per_battle = FoulPlayConfig.search_time_ms
-        battles = sample_unrevealed_pkmn(self, num_teams)
+            battles = sample_unrevealed_pkmn(self, num_teams)
 
         num_battles = len(battles)
 
