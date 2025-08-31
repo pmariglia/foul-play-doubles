@@ -68,71 +68,8 @@ def can_have_priority_modified(battle, pokemon, move_name):
     )
 
 
-def can_have_speed_modified(battle, pokemon):
-    return (
-        (
-            pokemon.item is None
-            and "unburden"
-            in [
-                normalize_name(a)
-                for a in pokedex[pokemon.name][constants.ABILITIES].values()
-            ]
-        )
-        or (
-            battle.weather == constants.RAIN
-            and pokemon.ability is None
-            and "swiftswim"
-            in [
-                normalize_name(a)
-                for a in pokedex[pokemon.name][constants.ABILITIES].values()
-            ]
-        )
-        or (
-            battle.weather == constants.SUN
-            and pokemon.ability is None
-            and "chlorophyll"
-            in [
-                normalize_name(a)
-                for a in pokedex[pokemon.name][constants.ABILITIES].values()
-            ]
-        )
-        or (
-            battle.weather == constants.SAND
-            and pokemon.ability is None
-            and "sandrush"
-            in [
-                normalize_name(a)
-                for a in pokedex[pokemon.name][constants.ABILITIES].values()
-            ]
-        )
-        or (
-            battle.weather in constants.HAIL_OR_SNOW
-            and pokemon.ability is None
-            and "slushrush"
-            in [
-                normalize_name(a)
-                for a in pokedex[pokemon.name][constants.ABILITIES].values()
-            ]
-        )
-        or (
-            battle.field == constants.ELECTRIC_TERRAIN
-            and pokemon.ability is None
-            and "surgesurfer"
-            in [
-                normalize_name(a)
-                for a in pokedex[pokemon.name][constants.ABILITIES].values()
-            ]
-        )
-        or (
-            pokemon.status == constants.PARALYZED
-            and pokemon.ability is None
-            and "quickfeet"
-            in [
-                normalize_name(a)
-                for a in pokedex[pokemon.name][constants.ABILITIES].values()
-            ]
-        )
-    )
+def can_have_speed_modified(pokemon):
+    return pokemon.item is None and pokemon.ability == "unburden"
 
 
 def remove_volatile(pkmn, volatile):
@@ -2394,6 +2331,36 @@ def update_speed_range(
         / boost_multiplier_lookup[opponent_pkmn.boosts[constants.SPEED]]
     )
 
+    if opponent_pkmn.ability == "swiftswim" and battle.weather in [
+        constants.RAIN,
+        constants.HEAVY_RAIN,
+    ]:
+        speed_threshold = int(speed_threshold / 2)
+
+    if opponent_pkmn.ability == "chlorophyll" and battle.weather in [
+        constants.SUN,
+        constants.DESOLATE_LAND,
+    ]:
+        speed_threshold = int(speed_threshold / 2)
+
+    if (
+        opponent_pkmn.ability == "slushrush"
+        and battle.weather in constants.HAIL_OR_SNOW
+    ):
+        speed_threshold = int(speed_threshold / 2)
+
+    if opponent_pkmn.ability == "sandrush" and battle.weather == constants.SAND:
+        speed_threshold = int(speed_threshold / 2)
+
+    if (
+        opponent_pkmn.ability == "surgesurfer"
+        and battle.field == constants.ELECTRIC_TERRAIN
+    ):
+        speed_threshold = int(speed_threshold / 2)
+
+    if opponent_pkmn.ability == "quickfeet" and opponent_pkmn.status is not None:
+        speed_threshold = int(speed_threshold / 2)
+
     if battle.opponent.side_conditions[constants.TAILWIND]:
         speed_threshold = int(speed_threshold / 2)
 
@@ -2416,6 +2383,12 @@ def update_speed_range(
         speed_threshold = int(speed_threshold / 1.5)
 
     if "protosynthesisspe" in bot_pkmn.volatile_statuses:
+        speed_threshold = int(speed_threshold * 1.5)
+
+    if "quarkdrivespe" in opponent_pkmn.volatile_statuses:
+        speed_threshold = int(speed_threshold / 1.5)
+
+    if "quarkdrivespe" in bot_pkmn.volatile_statuses:
         speed_threshold = int(speed_threshold * 1.5)
 
     if battle.trick_room:
@@ -2527,7 +2500,7 @@ def check_speed_ranges(battle, msg_lines):
 
     number_of_moves = len(moves)
 
-    if any(m[1][constants.ID] in ["encore", "grassyglide", "tailwind"] for m in moves):
+    if any(m[1][constants.ID] in ["encore", "grassyglide"] for m in moves):
         return
 
     is_opp = [m[0].startswith(battle.opponent.name) for m in moves]
@@ -2541,8 +2514,7 @@ def check_speed_ranges(battle, msg_lines):
             opp_pkmn = ssa[i][3]
             if (
                 opp_pkmn is None
-                or opp_pkmn.item == "choicescarf"
-                or can_have_speed_modified(battle, opp_pkmn)
+                or can_have_speed_modified(opp_pkmn)
                 or can_have_priority_modified(
                     battle, opp_pkmn, moves[i][1][constants.ID]
                 )
@@ -3260,10 +3232,61 @@ def update_battle(battle: Battle, msg: str):
     return False
 
 
+def get_next_speed_range_end(battle, msg_list):
+    # finds the first spot in msg_list that an effective speed could have changed
+    # this is used to know which subset of msg_list can be fed into check_speed_ranges
+    active_pkmn = [
+        battle.user.slot_a.active,
+        battle.user.slot_b.active,
+        battle.opponent.slot_a.active,
+        battle.opponent.slot_b.active,
+    ]
+    active_pkmn = [p for p in active_pkmn if p is not None]
+    i = 0
+    for i, line in enumerate(msg_list):
+        split_msg = line.split("|")
+        if len(split_msg) < 4:
+            continue
+
+        # tailwind activates for either side
+        if split_msg[1] == "-sidestart" and split_msg[3] == "move: Tailwind":
+            return i
+        elif (
+            split_msg[1] == "-weather"
+            and normalize_name(split_msg[2]) in [constants.RAIN, constants.HEAVY_RAIN]
+            and any(p.ability == "swiftswim" for p in active_pkmn)
+        ):
+            return i
+        elif (
+            split_msg[1] == "-weather"
+            and normalize_name(split_msg[2]) == constants.SAND
+            and any(p.ability == "sandrush" for p in active_pkmn)
+        ):
+            return i
+        elif (
+            split_msg[1] == "-weather"
+            and normalize_name(split_msg[2]) in constants.HAIL_OR_SNOW
+            and any(p.ability == "slushrush" for p in active_pkmn)
+        ):
+            return i
+        elif (
+            split_msg[1] == "-weather"
+            and normalize_name(split_msg[2]) in [constants.SUN, constants.DESOLATE_LAND]
+            and any(p.ability == "chlorophyll" for p in active_pkmn)
+        ):
+            return i
+
+    return i + 1
+
+
 def process_battle_updates(battle: Battle):
     msg_lines = battle.msg_list
-    check_speed_ranges(battle, msg_lines)
+    next_speed_range_check = -1
     for i, line in enumerate(msg_lines):
+        if i > next_speed_range_check:
+            next_speed_range_check = get_next_speed_range_end(battle, msg_lines[i:])
+            check_speed_ranges(battle, msg_lines[i : i + next_speed_range_check])
+
         split_msg = line.split("|")
         if len(split_msg) < 2:
             continue

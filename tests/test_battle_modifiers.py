@@ -41,7 +41,6 @@ from fp.battle_modifier import end_volatile_status
 from fp.battle_modifier import update_ability
 from fp.battle_modifier import form_change
 from fp.battle_modifier import clearnegativeboost
-from fp.battle_modifier import check_speed_ranges
 from fp.battle_modifier import singleturn
 from fp.battle_modifier import process_battle_updates
 from fp.battle_modifier import upkeep
@@ -3268,10 +3267,57 @@ class TestCheckSpeedRanges(unittest.TestCase):
             },
         }
 
+    def test_tailwind_splitting_speed_range(self):
+        self.battle.user.name = "p2"
+        self.battle.opponent.name = "p1"
+        self.battle.msg_list = [
+            "|-terastallize|p1a: Ursaluna|Normal",
+            "|move|p1b: Talonflame|Tailwind|p1b: Talonflame",
+            "|-sidestart|p1: 1.65meters|move: Tailwind",
+            "|move|p1a: Ursaluna|Blood Moon|p2a: Ninetales",
+            "|-damage|p2a: Ninetales|0 fnt",
+            "|faint|p2a: Ninetales",
+            "|-damage|p1a: Ursaluna|91/100|[from] item: Life Orb",
+            "|move|p2b: Garchomp|Rock Slide|p1b: Talonflame|[spread] p1a,p1b",
+            "|-supereffective|p1b: Talonflame",
+            "|-damage|p1a: Ursaluna|68/100",
+            "|-damage|p1b: Talonflame|0 fnt",
+            "|faint|p1b: Talonflame",
+        ]
+        # tailwind ursaluna must have at least 50 speed
+        # since it went before garchomp with 100 speed
+        self.battle.user.slot_b.active.stats[constants.SPEED] = 100
+        process_battle_updates(self.battle)
+        self.assertEqual(50, self.battle.opponent.slot_a.active.speed_range.min)
+
+    def test_rain_activating_when_someone_has_swiftswim_splitting_speed_range(self):
+        self.battle.user.name = "p2"
+        self.battle.opponent.name = "p1"
+        self.battle.opponent.slot_a.active.ability = "swiftswim"
+        self.battle.msg_list = [
+            "|-terastallize|p1a: Ursaluna|Normal",
+            "|switch|p1b: Pelipper|Pelipper, L50, M|100/100",
+            "|-weather|RainDance|[from] ability: Drizzle|[of] p1a: Pelipper",
+            "|move|p1a: Ursaluna|Blood Moon|p2a: Ninetales",
+            "|-damage|p2a: Ninetales|0 fnt",
+            "|faint|p2a: Ninetales",
+            "|-damage|p1a: Ursaluna|91/100|[from] item: Life Orb",
+            "|move|p2b: Garchomp|Rock Slide|p1b: Talonflame|[spread] p1a,p1b",
+            "|-supereffective|p1b: Talonflame",
+            "|-damage|p1a: Ursaluna|68/100",
+            "|-damage|p1b: Talonflame|0 fnt",
+            "|faint|p1b: Talonflame",
+        ]
+        # swiftswim on ursaluna must have at least 50 speed
+        # since it went before garchomp with 100 speed
+        self.battle.user.slot_b.active.stats[constants.SPEED] = 100
+        process_battle_updates(self.battle)
+        self.assertEqual(50, self.battle.opponent.slot_a.active.speed_range.min)
+
     def test_does_not_infer_if_bot_moved_and_then_fainted(
         self,
     ):
-        messages = [
+        self.battle.msg_list = [
             "|move|p1a: Ursaluna|Tackle|p2a: Incineroar",
             "|move|p2a: Incineroar|Tackle|p1a: Ursaluna",
             "|-damage|p1a: Ursaluna|0/100 brn",
@@ -3282,14 +3328,14 @@ class TestCheckSpeedRanges(unittest.TestCase):
             pokemon_name="ursaluna", move="tackle", turn=1
         )
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
         self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.max)
 
     def test_bots_pokemon_fainting_before_moving_sets_min_speed_on_opponents_when_priorities_are_the_same(
         self,
     ):
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
             "|-damage|p1a: Ursaluna|0/100 brn",
             "|faint|p1a: Ursaluna",
@@ -3299,13 +3345,13 @@ class TestCheckSpeedRanges(unittest.TestCase):
             pokemon_name="ursaluna", move="tackle", turn=1
         )
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_choicescarf_impacts_speed_range(
         self,
     ):
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
             "|-damage|p1a: Ursaluna|0/100 brn",
             "|faint|p1a: Ursaluna",
@@ -3316,7 +3362,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
             pokemon_name="ursaluna", move="tackle", turn=1
         )
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(
             int(100 / 1.5), self.battle.opponent.slot_a.active.speed_range.min
         )
@@ -3327,7 +3373,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.name = "ursaluna"
         self.battle.opponent.slot_a.active.name = "incineroar"
         self.battle.opponent.slot_b.active.name = "sneasler"
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
             "|move|p2b: Sneasler|Dire Claw|p1b: Ursaluna",
             "|-damage|p1a: Ursaluna|0/100 brn",
@@ -3338,14 +3384,14 @@ class TestCheckSpeedRanges(unittest.TestCase):
             pokemon_name="ursaluna", move="tackle", turn=1
         )
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
         self.assertEqual(100, self.battle.opponent.slot_b.active.speed_range.min)
 
     def test_does_not_infer_from_faint_when_move_was_after_faint_msg(
         self,
     ):
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
             "|-damage|p1a: Ursaluna|0/100 brn",
             "|faint|p1a: Ursaluna",
@@ -3356,12 +3402,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
             pokemon_name="ursaluna", move="tackle", turn=1
         )
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
         self.assertEqual(0, self.battle.opponent.slot_b.active.speed_range.min)
 
     def test_does_not_infer_speed_if_fainted_after_switching(self):
-        messages = [
+        self.battle.msg_list = [
             "|switch|p1a: Ursaluna|Ursaluna, L50, M|100/100",
             "|move|p2a: Incineroar|Tackle|p1b: Ursaluna",
             "|-damage|p1a: Ursaluna|0/100 brn",
@@ -3372,11 +3418,11 @@ class TestCheckSpeedRanges(unittest.TestCase):
             pokemon_name="ursaluna", move="switch ursaluna", turn=1
         )
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(0, self.battle.opponent.slot_b.active.speed_range.min)
 
     def test_bot_side_getting_cant_can_be_used_to_infer_faster_than(self):
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Incineroar|Fake Out|p1b: Ursaluna",
             "|-damage|p1a: Ursaluna|82/100 brn",
             # The order of the next two reveals speed ranges
@@ -3389,11 +3435,11 @@ class TestCheckSpeedRanges(unittest.TestCase):
             pokemon_name="ursaluna", move="tackle", turn=1
         )
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(100, self.battle.opponent.slot_b.active.speed_range.min)
 
     def test_bot_using_priority_move_but_getting_flinched(self):
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Incineroar|Fake Out|p1b: Ursaluna",
             "|-damage|p1a: Ursaluna|82/100 brn",
             "|cant|p1a: Ursaluna|flinch",  # this was trying to use fakeout, meaning p2a is faster than p1a
@@ -3404,11 +3450,11 @@ class TestCheckSpeedRanges(unittest.TestCase):
             pokemon_name="ursaluna", move="fakeout", turn=1
         )
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_bot_side_getting_cant_can_be_used_to_infer_slower_than(self):
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Incineroar|Fake Out|p1b: Ursaluna",
             "|-damage|p1a: Ursaluna|82/100 brn",
             "|cant|p1a: Ursaluna|flinch",  # this was trying to use tackle, meaning p1a is faster than p2b
@@ -3419,11 +3465,11 @@ class TestCheckSpeedRanges(unittest.TestCase):
             pokemon_name="ursaluna", move="tackle", turn=1
         )
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(100, self.battle.opponent.slot_b.active.speed_range.max)
 
     def test_opponent_side_getting_cant_does_not_reveal_speed_range(self):
-        messages = [
+        self.battle.msg_list = [
             "|move|p1a: Incineroar|Fake Out|p2b: Ursaluna",
             "|-damage|p2a: Ursaluna|82/100 brn",
             "|cant|p2a: Ursaluna|flinch",  # we can't infer anything here, because we don't know what move the opponent was trying to use
@@ -3431,14 +3477,14 @@ class TestCheckSpeedRanges(unittest.TestCase):
         ]
         self.battle.turn = 1
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(
             float("inf"), self.battle.opponent.slot_b.active.speed_range.max
         )
         self.assertEqual(0, self.battle.opponent.slot_b.active.speed_range.min)
 
     def test_switch_and_fakeout_still_allow_other_two_speeds_to_be_checked(self):
-        messages = [
+        self.battle.msg_list = [
             # p1 switching
             "|switch|p1b: Archaludon|Archaludon, L50, M|100/100",
             # p2 using priority move
@@ -3451,7 +3497,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.name = "p2"
         self.battle.opponent.name = "p1"
         self.battle.user.slot_a.active.stats[constants.SPEED] = 100
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(100, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_protosynthesis_speed_is_accounted_for_in_speed_range_check(self):
@@ -3462,12 +3508,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.opponent.slot_a.active.stats[constants.SPEED] = 370
         self.battle.opponent.slot_a.active.volatile_statuses.append("protosynthesisspe")
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Pikachu|U-turn|p1a: Caterpie",
             "|move|p1a: Caterpie|Tackle|p1a: Caterpie",
             "|faint|p2a: Caterpie",
         ]
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(
             300, self.battle.opponent.slot_a.active.speed_range.min
         )  # unchanged
@@ -3477,14 +3523,14 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "agility", 0)
 
-        messages = [
+        self.battle.msg_list = [
             "|cant|p1a: Caterpie|recharge",
             "|move|p2a: Pikachu|Tackle|p1a: Caterpie",
             "|-damage|p1a: Caterpie|1/100",
             "|upkeep",
             "|turn|7",
         ]
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(
             0, self.battle.opponent.slot_a.active.speed_range.min
         )  # unchanged
@@ -3494,7 +3540,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "agility", 0)
 
-        messages = [
+        self.battle.msg_list = [
             "|-activate|p1a: Caterpie|confusion",
             "|-damage|p1a: Caterpie|15/100|[from] confusion",
             "|move|p2a: Pikachu|Tackle|p1a: Caterpie",
@@ -3502,7 +3548,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
             "|upkeep",
             "|turn|7",
         ]
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(
             0, self.battle.opponent.slot_a.active.speed_range.min
         )  # unchanged
@@ -3512,7 +3558,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "agility", 0)
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Pikachu|Tackle|p1a: Caterpie",
             "|-damage|p1a: Caterpie|1/100",
             "|move|p1a: Caterpie|Agility|p1a: Caterpie",
@@ -3520,7 +3566,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
             "|upkeep",
             "|turn|7",
         ]
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(150, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_boosting_speed_before_opponent_does_not_mess_up_speed_range_check(self):
@@ -3528,7 +3574,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "agility", 0)
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p1a: Caterpie|Agility|p1a: Caterpie",
             "|-boost|p1a: Caterpie|spe|2",
             "|move|p2a: Pikachu|Tackle|p1a: Caterpie",
@@ -3536,7 +3582,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
             "|upkeep",
             "|turn|7",
         ]
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(150, self.battle.opponent.slot_a.active.speed_range.max)
 
     def test_user_knocking_out_opponent_does_nothing(
@@ -3546,14 +3592,14 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.opponent.slot_a.active.stats[constants.SPEED] = 100
         self.battle.user.last_selected_move = LastUsedMove("caterpie", "tackle", 0)
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p1a: Caterpie|Tackle|p2a: Pikachu",
             "|-damage|p2a: Pikachu|0 fnt",
             "|faint|p2a: Pikachu",
             "|upkeep",
             "|turn|7",
         ]
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_suckerpunch_and_thunderclap_sets_speed_ranges(self):
@@ -3561,7 +3607,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.opponent.slot_a.active.stats[constants.SPEED] = 175
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Raging Bolt|Thunderclap|p1a: Kingambit"
             "|-damage|p1a: Kingambit|46/100",
             "|-enditem|p1a: Kingambit|Air Balloon",
@@ -3572,7 +3618,7 @@ class TestCheckSpeedRanges(unittest.TestCase):
             "|turn|7",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(
             150,
@@ -3583,12 +3629,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         # opponent should have min speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(
             self.battle.user.slot_a.active.stats[constants.SPEED],
@@ -3600,12 +3646,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.trick_room = True
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(
             self.battle.user.slot_a.active.stats[constants.SPEED],
@@ -3617,12 +3663,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.trick_room = True
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Aqua Jet|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(
             float("inf"), self.battle.opponent.slot_a.active.speed_range.max
@@ -3634,12 +3680,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.opponent.slot_a.active.status = constants.PARALYZED
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # bot_speed * 2 should be the minspeed it has b/c it went first with paralysis
         expected_min_speed = int(
@@ -3655,12 +3701,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.user.slot_a.active.status = constants.PARALYZED
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # bot_speed / 2 should be the minspeed it has b/c it went first with paralysis
         expected_min_speed = int(
@@ -3676,12 +3722,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 300
         self.battle.opponent.side_conditions[constants.TAILWIND] = 1
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # bot_speed / 2 should be the minspeed it has b/c it went first with tailwind up
         expected_min_speed = int(
@@ -3697,12 +3743,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 300
         self.battle.user.side_conditions[constants.TAILWIND] = 1
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # bot_speed * 2 should be the minspeed it has b/c it went first with tailwind up
         expected_min_speed = int(
@@ -3719,12 +3765,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.side_conditions[constants.TAILWIND] = 1
         self.battle.opponent.side_conditions[constants.TAILWIND] = 1
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # bot_speed / 2 should be the minspeed it has b/c it went first with tailwind up
         expected_min_speed = int(
@@ -3742,16 +3788,14 @@ class TestCheckSpeedRanges(unittest.TestCase):
         # opponent should have min speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.opponent.slot_a.active.item = None
-        self.battle.opponent.slot_a.active.name = (
-            "hawlucha"  # can possibly have unburden
-        )
+        self.battle.opponent.slot_a.active.ability = "unburden"
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
@@ -3759,44 +3803,44 @@ class TestCheckSpeedRanges(unittest.TestCase):
         # opponent should have max speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p1a: Caterpie|Stealth Rock|",
             "|move|p2a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(
             self.battle.user.slot_a.active.stats[constants.SPEED],
             self.battle.opponent.slot_a.active.speed_range.max,
         )
 
-    def test_minspeed_is_not_set_when_rain_is_up_and_opponent_can_have_swiftswim(self):
+    def test_minspeed_accounts_for_swiftswim(self):
         # opponent should have max speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.weather = constants.RAIN
-        self.battle.opponent.slot_a.active.name = "seismitoad"
+        self.battle.opponent.slot_a.active.ability = "swiftswim"
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
-        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
+        self.assertEqual(150 / 2, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_minspeed_is_set_when_only_rain_is_up(self):
         # opponent should have max speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.weather = constants.RAIN
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(
             self.battle.user.slot_a.active.stats[constants.SPEED],
@@ -3810,43 +3854,43 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.opponent.slot_a.active.name = "seismitoad"
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(
             self.battle.user.slot_a.active.stats[constants.SPEED],
             self.battle.opponent.slot_a.active.speed_range.min,
         )
 
-    def test_minspeed_is_not_set_when_opponent_has_choicescarf(self):
+    def test_minspeed_accounts_for_choicescarf(self):
         # opponent should have max speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.opponent.slot_a.active.item = "choicescarf"
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
-        self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
+        self.assertEqual(150 / 1.5, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_minspeed_is_correctly_set_when_bot_has_choicescarf(self):
         # opponent should have max speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.user.slot_a.active.item = "choicescarf"
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p1a: Caterpie|Stealth Rock|",
             "|move|p2a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(
             self.battle.user.slot_a.active.stats[constants.SPEED] * 1.5,
@@ -3862,12 +3906,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.item = "choicescarf"
         self.battle.opponent.slot_a.active.boosts[constants.SPEED] = 1
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # this is meant to show the rounding inherent with way pokemon floors values
         # floor(317 / 1.5) = 211
@@ -3886,12 +3930,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.opponent.slot_a.active.boosts[constants.SPEED] = 1
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # the minspeed should take into account the fact that the opponent has a boost
         # therefore, the minimum (unboosted) speed must be divided by the boost multiplier
@@ -3911,12 +3955,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.user.slot_a.active.boosts[constants.SPEED] = 1
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # the minspeed should take into account the fact that the opponent has a boost
         # therefore, the minimum (unboosted) speed must be divided by the boost multiplier
@@ -3940,12 +3984,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.boosts[constants.SPEED] = 1
         self.battle.opponent.slot_a.active.boosts[constants.SPEED] = 3
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # the minspeed should take into account the fact that the opponent has a boost
         # therefore, the minimum (unboosted) speed must be divided by the boost multiplier
@@ -3967,12 +4011,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         # opponent should have max speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|unknown-move|",
             "|move|p1a: Caterpie|unknown-move|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(150, self.battle.opponent.slot_a.active.speed_range.min)
 
@@ -3980,12 +4024,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         # opponent should have max speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p1a: Caterpie|unknown-move|",
             "|move|p2a: Caterpie|unknown-move|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         self.assertEqual(150, self.battle.opponent.slot_a.active.speed_range.max)
 
@@ -4002,12 +4046,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         # opponent should have max speed equal to the bot's speed
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         expected_min_speed = 150
         self.assertEqual(
             expected_min_speed, self.battle.opponent.slot_a.active.speed_range.min
@@ -4019,12 +4063,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.field = constants.GRASSY_TERRAIN
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p2a: Caterpie|Grassy Glide|",
             "|move|p1a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(0, self.battle.opponent.slot_a.active.speed_range.min)
 
     def test_bot_using_grassyglide_in_grassy_terrain_does_not_cause_maxspeed_to_be_set(
@@ -4033,12 +4077,12 @@ class TestCheckSpeedRanges(unittest.TestCase):
         self.battle.user.slot_a.active.stats[constants.SPEED] = 150
         self.battle.field = constants.GRASSY_TERRAIN
 
-        messages = [
+        self.battle.msg_list = [
             "|move|p1a: Caterpie|Grassy Glide|",
             "|move|p2a: Caterpie|Stealth Rock|",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
         self.assertEqual(
             float("inf"), self.battle.opponent.slot_a.active.speed_range.max
         )
@@ -4047,13 +4091,13 @@ class TestCheckSpeedRanges(unittest.TestCase):
         user_reserve_weedle = Pokemon("Weedle", 100)
         self.battle.user.reserve = [user_reserve_weedle]
 
-        messages = [
+        self.battle.msg_list = [
             "|switch|p1a: Caterpie|Caterpie, F|255/255",
             "|move|p2a: Caterpie|Stealth Rock|",
             "|move|p1a: Caterpie|Stealth Rock|p2a: Caterpie|[from]ability: Magic Bounce",
         ]
 
-        check_speed_ranges(self.battle, messages)
+        process_battle_updates(self.battle)
 
         # speed ranges should be unchanged because this was a switch-in
         self.assertEqual(
