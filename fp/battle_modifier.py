@@ -2891,9 +2891,16 @@ def _do_check(
             )
 
         if check_type == "damage_received":
-            actual_damage_dealt = (
-                damage_dealt.percent_damage * damage_dealt.target_slot.active.max_hp
-            )
+            if opponent_slot.identifier == "a":
+                actual_damage_dealt = (
+                    damage_dealt.percent_damage
+                    * battle_copy.opponent.slot_a.active.max_hp
+                )
+            else:
+                actual_damage_dealt = (
+                    damage_dealt.percent_damage
+                    * battle_copy.opponent.slot_b.active.max_hp
+                )
 
             if bot_went_first:
                 opponent_move = constants.DO_NOTHING_MOVE
