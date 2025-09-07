@@ -2993,8 +2993,6 @@ def update_dataset_possibilities(
             "mirrorcoat",
             "metalburst",
             "foulplay",
-            "meteorbeam",
-            "electroshot",
             "ficklebeam",
             "lashout",
             "ragefist",
