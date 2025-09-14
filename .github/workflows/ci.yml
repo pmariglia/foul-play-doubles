@@ -17,13 +17,12 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.13'
-    - name: Install the latest version of uv
-      uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6
     - name: Install dependencies
       run: |
-        uv sync
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
     - name: fmt, lint, & test
       run: |
-        uv run ruff check
-        uv run ruff format --check --diff
-        uv run pytest tests
+        ruff check
+        ruff format --check --diff
+        pytest tests

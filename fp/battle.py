@@ -102,7 +102,7 @@ class Battle:
     def mega_evolve_possible(self):
         return (
             any(g in self.generation for g in constants.MEGA_EVOLVE_GENERATIONS)
-            or "nationaldex" in FoulPlayConfig.pokemon_mode
+            or "nationaldex" in FoulPlayConfig.pokemon_format
         )
 
     def get_effective_speed(self, battler):

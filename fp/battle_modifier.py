@@ -13,7 +13,7 @@ from fp.battle import Pokemon, Battle, Slot
 from fp.battle import LastUsedMove
 from fp.battle import DamageDealt
 from fp.battle import StatRange
-from fp.battle_bots.poke_engine_helpers import poke_engine_get_damage_rolls
+from fp.search.poke_engine_helpers import poke_engine_get_damage_rolls
 from fp.helpers import normalize_name
 from fp.helpers import get_pokemon_info_from_condition
 from fp.helpers import calculate_stats

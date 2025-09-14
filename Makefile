@@ -17,8 +17,8 @@ lint:
 poke_engine:
 	@poke_engine_version=$$(grep -oE 'poke-engine-doubles==[0-9]+\.[0-9]+\.[0-9]+' pyproject.toml); \
 	echo "Installing $$poke_engine_version with feature $(GEN)"; \
-	uv pip uninstall poke-engine-doubles && uv pip install -v --force-reinstall --no-cache-dir $$poke_engine_version --config-settings="build-args=--features poke-engine/$(GEN) --no-default-features"
+	pip uninstall poke-engine-doubles && pip install -v --force-reinstall --no-cache-dir $$poke_engine_version --config-settings="build-args=--features poke-engine/$(GEN) --no-default-features"
 
 # This assumes that the pmariglia/poke-engine repository is in the same directory as foul-play
 poke_engine_local:
-	uv pip uninstall poke-engine-doubles && uv pip install -v --force-reinstall --no-cache-dir ../poke-engine-doubles/poke-engine-py --config-settings="build-args=--features poke-engine/$(GEN) --no-default-features"
+	pip uninstall poke-engine-doubles && pip install -v --force-reinstall --no-cache-dir ../poke-engine-doubles/poke-engine-py --config-settings="build-args=--features poke-engine/$(GEN) --no-default-features"

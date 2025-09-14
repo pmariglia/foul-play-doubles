@@ -1,4 +1,3 @@
-import importlib
 import json
 import asyncio
 import concurrent.futures
@@ -9,9 +8,10 @@ import constants
 from config import FoulPlayConfig, SaveReplay
 from data.pkmn_sets import SmogonSets
 from fp.battle import LastUsedMove, Pokemon, Battle
-from fp.battle_bots.helpers import format_decision
+from fp.search.helpers import format_decision
 from fp.battle_modifier import async_update_battle
 from fp.helpers import normalize_name
+from fp.search.main import find_best_move
 
 from fp.websocket_client import PSWebsocketClient
 
@@ -50,7 +50,7 @@ async def async_pick_move(battle):
     loop = asyncio.get_event_loop()
     with concurrent.futures.ThreadPoolExecutor() as pool:
         choice_a, choice_b = await loop.run_in_executor(
-            pool, battle_copy.find_best_move
+            pool, find_best_move, battle_copy
         )
     battle.user.slot_a.last_selected_move = LastUsedMove(
         battle.user.slot_a.active.name,
@@ -187,9 +187,7 @@ async def start_battle_common(
             "{}_{}.log".format(battle_tag, opponent_name)
         )
 
-    battle = importlib.import_module(
-        "fp.battle_bots.{}.main".format(FoulPlayConfig.battle_bot_module)
-    ).BattleBot(battle_tag)
+    battle = Battle(battle_tag)
     battle.opponent.account_name = opponent_name
     battle.generation = pokemon_battle_type[:4]
 
@@ -277,8 +275,8 @@ async def pokemon_battle(
             else:
                 winner = None
             logger.info("Winner: {}".format(winner))
-            if FoulPlayConfig.save_replay == SaveReplay.Always or (
-                FoulPlayConfig.save_replay == SaveReplay.OnLoss
+            if FoulPlayConfig.save_replay == SaveReplay.always or (
+                FoulPlayConfig.save_replay == SaveReplay.on_loss
                 and winner != FoulPlayConfig.username
             ):
                 await ps_websocket_client.save_replay(battle.battle_tag)
@@ -291,8 +289,8 @@ async def pokemon_battle(
             else:
                 winner = None
             logger.info("Bo3 Winner: {}".format(winner))
-            if FoulPlayConfig.save_replay == SaveReplay.Always or (
-                FoulPlayConfig.save_replay == SaveReplay.OnLoss
+            if FoulPlayConfig.save_replay == SaveReplay.always or (
+                FoulPlayConfig.save_replay == SaveReplay.on_loss
                 and winner != FoulPlayConfig.username
             ):
                 await ps_websocket_client.save_replay(battle.battle_tag)

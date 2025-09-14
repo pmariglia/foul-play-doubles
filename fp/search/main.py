@@ -14,7 +14,7 @@ from poke_engine import (
     MctsResult,
 )
 
-from ..poke_engine_helpers import battle_to_poke_engine_state
+from fp.search.poke_engine_helpers import battle_to_poke_engine_state
 
 logger = logging.getLogger(__name__)
 
@@ -144,46 +144,38 @@ def get_result_from_mcts(state: str, search_time_ms: int, index: int) -> MctsRes
     return res
 
 
-class BattleBot(Battle):
-    def __init__(self, *args, **kwargs):
-        super(BattleBot, self).__init__(*args, **kwargs)
+def find_best_move(battle):
+    if battle.team_preview:
+        battles = get_battles_for_team_preview(battle)
+        parallelism = FoulPlayConfig.parallelism
+        search_time_per_battle = FoulPlayConfig.search_time_ms // 2
+    else:
+        num_teams = 4
+        parallelism = FoulPlayConfig.parallelism
+        search_time_per_battle = FoulPlayConfig.search_time_ms
+        battles = sample_unrevealed_pkmn(battle, num_teams)
 
-    def find_best_move(self):
-        if self.team_preview:
-            battles = get_battles_for_team_preview(self)
-            parallelism = FoulPlayConfig.parallelism
-            search_time_per_battle = FoulPlayConfig.search_time_ms // 2
-        else:
-            num_teams = 4
-            parallelism = FoulPlayConfig.parallelism
-            search_time_per_battle = FoulPlayConfig.search_time_ms
-            battles = sample_unrevealed_pkmn(self, num_teams)
+    num_battles = len(battles)
 
-        num_battles = len(battles)
+    logger.info("Searching for a move using MCTS...")
+    logger.info(
+        "Sampling {} battles at {}ms each".format(num_battles, search_time_per_battle)
+    )
 
-        logger.info("Searching for a move using MCTS...")
-        logger.info(
-            "Sampling {} battles at {}ms each".format(
-                num_battles, search_time_per_battle
+    with ProcessPoolExecutor(max_workers=parallelism) as executor:
+        futures = []
+        for index, (b, chance) in enumerate(battles):
+            fut = executor.submit(
+                get_result_from_mcts,
+                battle_to_poke_engine_state(b).to_string(),
+                search_time_per_battle,
+                index,
             )
-        )
+            futures.append((fut, chance, index))
 
-        with ProcessPoolExecutor(max_workers=parallelism) as executor:
-            futures = []
-            for index, (b, chance) in enumerate(battles):
-                fut = executor.submit(
-                    get_result_from_mcts,
-                    battle_to_poke_engine_state(b).to_string(),
-                    search_time_per_battle,
-                    index,
-                )
-                futures.append((fut, chance, index))
+    mcts_results = [(fut.result(), chance, index) for (fut, chance, index) in futures]
 
-        mcts_results = [
-            (fut.result(), chance, index) for (fut, chance, index) in futures
-        ]
+    choice = select_move_from_mcts_results(mcts_results)
+    logger.info("Choice: {}".format(choice))
 
-        choice = select_move_from_mcts_results(mcts_results)
-        logger.info("Choice: {}".format(choice))
-
-        return choice
+    return choice
