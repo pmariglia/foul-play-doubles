@@ -916,6 +916,7 @@ def setboost(battle, split_msg):
     stat = constants.STAT_ABBREVIATION_LOOKUPS[split_msg[3].strip()]
     amount = int(split_msg[4].strip())
     pkmn.boosts[stat] = amount
+    logger.info("Set {}'s {} boost to {}".format(pkmn.name, stat, amount))
 
 
 def boost(battle, split_msg):
