@@ -235,7 +235,7 @@ class _SmogonSets:
                     if counter_name not in final_effectiveness:
                         final_effectiveness[counter_name] = {}
                     final_effectiveness[counter_name][normalize_name(pkmn_name)] = (
-                        round(counter_information[1], 2)
+                        round(counter_information["p"], 2)
                     )
 
             for spread, count in sorted(
