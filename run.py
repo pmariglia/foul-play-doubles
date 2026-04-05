@@ -5,7 +5,7 @@ import traceback
 from copy import deepcopy
 from config import FoulPlayConfig, init_logging, BotModes
 
-from teams import load_team
+from teams import load_team, TeamListIterator
 from fp.run_battle import pokemon_battle
 from fp.websocket_client import PSWebsocketClient
 
@@ -57,11 +57,21 @@ async def run_foul_play():
     if FoulPlayConfig.avatar is not None:
         await ps_websocket_client.avatar(FoulPlayConfig.avatar)
 
+    team_iterator = (
+        None
+        if FoulPlayConfig.team_list is None
+        else TeamListIterator(FoulPlayConfig.team_list)
+    )
     battles_run = 0
     wins = 0
     losses = 0
     while True:
-        team_export, team_dict, file_name = load_team(FoulPlayConfig.team_name)
+        team_name = (
+            team_iterator.get_next_team()
+            if team_iterator is not None
+            else FoulPlayConfig.team_name
+        )
+        team_export, team_dict, file_name = load_team(team_name)
         if FoulPlayConfig.bot_mode == BotModes.challenge_user:
             await ps_websocket_client.challenge_user(
                 FoulPlayConfig.user_to_challenge,
