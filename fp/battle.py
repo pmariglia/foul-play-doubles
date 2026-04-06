@@ -57,6 +57,13 @@ class StatRange:
     max: int | float
 
 
+@dataclass
+class BattleData:
+    opponent_leads: set[str] | None
+    opponent_picks: set[str] | None
+    win: bool
+
+
 class Battle:
     def __init__(self, battle_tag):
         self.battle_tag = battle_tag
@@ -86,6 +93,8 @@ class Battle:
 
         self.request_json = None
         self.msg_list = []
+        self.battle_data = BattleData(set(), set(), False)
+        self.previous_battle_data: list[BattleData] = []
 
     def during_team_preview(self): ...
 

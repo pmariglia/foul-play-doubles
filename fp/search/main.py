@@ -3,15 +3,18 @@ import random
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 
+from poke_engine.poke_engine import TeamPreviewFilters, TeamPreviewFilterSide
+
 import constants
 from data.pkmn_sets import SmogonSets
-from fp.battle import Battle, Pokemon
+from fp.battle import Battle, Pokemon, BattleData
 from config import FoulPlayConfig
 
 from poke_engine import (
     State as PokeEngineState,
     monte_carlo_tree_search,
     MctsResult,
+    monte_carlo_tree_search_team_preview,
 )
 
 from fp.search.poke_engine_helpers import battle_to_poke_engine_state
@@ -61,22 +64,15 @@ def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, floa
     return battles
 
 
-def get_battles_for_team_preview(battle: Battle) -> list[Battle]:
-    # for all 6 pkmn in the opponent's reserve, create a battle of 4 pkmn
-    # get all 15 combinations of 4 pkmn from the 6
-    from itertools import combinations
-
+def get_battles_for_team_preview(battle: Battle, num_battles: int) -> list[Battle]:
     battles = []
-    i = 0
-    for reserve_comb in combinations(battle.opponent.reserve, 4):
+    for i in range(num_battles):
         battle_copy = deepcopy(battle)
-        battle_copy.opponent.reserve = deepcopy(list(reserve_comb))
         team_preview_shuffle(battle_copy)
         populate_spreads(battle_copy, i)
         battle_copy.opponent.slot_a.lock_moves()
         battle_copy.opponent.slot_b.lock_moves()
-        battles.append((battle_copy, 1 / 15))
-        i += 1
+        battles.append((battle_copy, 1 / num_battles))
     return battles
 
 
@@ -144,16 +140,82 @@ def get_result_from_mcts(state: str, search_time_ms: int, index: int) -> MctsRes
     return res
 
 
+def opponent_team_preview_side_filter(
+    battle: Battle, previous_battle_data: BattleData
+) -> TeamPreviewFilterSide:
+    side_filter = TeamPreviewFilterSide(
+        leads=[tuple(previous_battle_data.opponent_leads)],
+        valid_pokemon=list(previous_battle_data.opponent_picks)
+        + list(previous_battle_data.opponent_leads),
+    )
+    if len(side_filter.valid_pokemon) != 4:
+        side_filter.valid_pokemon = [p.name for p in battle.opponent.reserve]
+
+    return side_filter
+
+
+def get_teampreview_filters(
+    battle: Battle, our_side_filters: TeamPreviewFilterSide, parallelism: int
+) -> list[TeamPreviewFilters]:
+    previous_battle_data = battle.previous_battle_data
+
+    result = []
+    for pbd in previous_battle_data:
+        side_two_filter = opponent_team_preview_side_filter(battle, pbd)
+        result.append(
+            TeamPreviewFilters(
+                side_one=our_side_filters,
+                side_two=side_two_filter,
+            )
+        )
+        if not pbd.win:
+            result.append(
+                TeamPreviewFilters(
+                    side_one=our_side_filters,
+                    side_two=side_two_filter,
+                )
+            )
+
+    result = result[-parallelism:]
+    while len(result) < parallelism:
+        result.append(
+            TeamPreviewFilters(
+                side_one=our_side_filters,
+                side_two=TeamPreviewFilterSide(
+                    leads=None,
+                    valid_pokemon=[pkmn.name for pkmn in battle.opponent.reserve],
+                ),
+            )
+        )
+
+    return result
+
+
+def get_result_from_teampreview_mcts(
+    state: str, search_time_ms: int, index: int, team_preview_filter: TeamPreviewFilters
+) -> MctsResult:
+    logger.info(
+        f"Side Two Forced Leads ({index=}): {team_preview_filter.side_two.leads}"
+    )
+    logger.info(
+        f"Side Two Valid Pkmn ({index=}): {team_preview_filter.side_two.valid_pokemon}"
+    )
+    logger.debug("Calling with {} state: {}".format(index, state))
+    poke_engine_state = PokeEngineState.from_string(state)
+    res = monte_carlo_tree_search_team_preview(
+        poke_engine_state,
+        team_preview_filter,
+        search_time_ms,
+    )
+    logger.info("Iterations {}: {}".format(index, res.total_visits))
+    return res
+
+
 def find_best_move(battle):
-    if battle.team_preview:
-        battles = get_battles_for_team_preview(battle)
-        parallelism = FoulPlayConfig.parallelism
-        search_time_per_battle = FoulPlayConfig.search_time_ms // 2
-    else:
-        num_teams = 4
-        parallelism = FoulPlayConfig.parallelism
-        search_time_per_battle = FoulPlayConfig.search_time_ms
-        battles = sample_unrevealed_pkmn(battle, num_teams)
+    num_teams = 4
+    parallelism = FoulPlayConfig.parallelism
+    search_time_per_battle = FoulPlayConfig.search_time_ms
+    battles = sample_unrevealed_pkmn(battle, num_teams)
 
     num_battles = len(battles)
 
@@ -170,6 +232,45 @@ def find_best_move(battle):
                 battle_to_poke_engine_state(b).to_string(),
                 search_time_per_battle,
                 index,
+            )
+            futures.append((fut, chance, index))
+
+    mcts_results = [(fut.result(), chance, index) for (fut, chance, index) in futures]
+
+    choice = select_move_from_mcts_results(mcts_results)
+    logger.info("Choice: {}".format(choice))
+
+    return choice
+
+
+def find_best_move_teampreview(battle):
+    parallelism = FoulPlayConfig.parallelism // 2
+    search_time_per_battle = min(40_000, FoulPlayConfig.search_time_ms * 2)
+
+    battles = get_battles_for_team_preview(battle, parallelism)
+
+    our_side_filter = TeamPreviewFilterSide(
+        valid_pokemon=[p.name for p in battle.user.reserve], leads=None
+    )
+    team_preview_filters = get_teampreview_filters(battle, our_side_filter, parallelism)
+
+    num_battles = len(battles)
+    logger.info("Searching for a move using MCTS...")
+    logger.info(
+        "Sampling {} battles at {}ms each".format(num_battles, search_time_per_battle)
+    )
+
+    with ProcessPoolExecutor(max_workers=parallelism) as executor:
+        futures = []
+        for index, ((b, chance), tp_filter) in enumerate(
+            zip(battles, team_preview_filters)
+        ):
+            fut = executor.submit(
+                get_result_from_teampreview_mcts,
+                battle_to_poke_engine_state(b).to_string(),
+                search_time_per_battle,
+                index,
+                tp_filter,
             )
             futures.append((fut, chance, index))
 

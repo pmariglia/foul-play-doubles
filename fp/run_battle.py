@@ -7,11 +7,11 @@ import logging
 import constants
 from config import FoulPlayConfig, SaveReplay
 from data.pkmn_sets import SmogonSets
-from fp.battle import LastUsedMove, Pokemon, Battle
+from fp.battle import LastUsedMove, Pokemon, Battle, BattleData
 from fp.search.helpers import format_decision
 from fp.battle_modifier import async_update_battle
 from fp.helpers import normalize_name
-from fp.search.main import find_best_move
+from fp.search.main import find_best_move, find_best_move_teampreview
 
 from fp.websocket_client import PSWebsocketClient
 
@@ -40,6 +40,24 @@ def extract_battle_factory_tier_from_msg(msg):
     tier_name = msg[start:end]
 
     return normalize_name(tier_name)
+
+
+async def async_pick_move_teampreview(battle):
+    battle_copy = deepcopy(battle)
+    if not battle_copy.team_preview:
+        battle_copy.user.update_from_request_json(battle_copy.request_json)
+
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        choice_a, choice_b = await loop.run_in_executor(
+            pool, find_best_move_teampreview, battle_copy
+        )
+    switch_a, faint_1 = choice_a.split(",")
+    switch_b, faint_2 = choice_b.split(",")
+    logger.info(f"Leads: {switch_a}, {switch_b}")
+    logger.info(f"Leaving behind: {faint_1}, {faint_2}")
+
+    return (switch_a, switch_b), (faint_1, faint_2)
 
 
 async def async_pick_move(battle):
@@ -75,92 +93,33 @@ async def handle_team_preview(battle, ps_websocket_client):
     battle_copy.opponent.slot_b.active = Pokemon.get_dummy()
     battle_copy.team_preview = True
 
-    best_move_a, best_move_b = await async_pick_move(battle_copy)
-    logger.info("Best move A: {}".format(best_move_a))
-    logger.info("Best move B: {}".format(best_move_b))
-
-    # because we copied the battle before sending it in, we need to update the last selected move here
-    pkmn_name_a = battle.user.find_pkmn_by_index(int(best_move_a.split()[1])).name
-    pkmn_name_b = battle.user.find_pkmn_by_index(int(best_move_b.split()[1])).name
-    logger.info(f"{pkmn_name_a=} {pkmn_name_b=}")
-    battle.user.slot_a.last_selected_move = LastUsedMove(
-        "teampreview", "switch {}".format(pkmn_name_a), battle.turn
-    )
-    battle.user.slot_b.last_selected_move = LastUsedMove(
-        "teampreview", "switch {}".format(pkmn_name_b), battle.turn
+    (switch_a, switch_b), (faint_1, faint_2) = await async_pick_move_teampreview(
+        battle_copy
     )
 
-    choice_digit_a = int(best_move_a.split()[-1])
-    choice_digit_b = int(best_move_b.split()[-1])
-
-    # choose the other two pokemon with the highest average effectiveness
-    # I don't think this is the best way to do it, will come back to this
-    remaining_pkmn_by_effectiveness = sorted(
-        [
-            (
-                p.name,
-                p.index,
-                sum(SmogonSets.raw_pkmn_sets[p.name]["effectiveness"].values())
-                / len(SmogonSets.raw_pkmn_sets[p.name]["effectiveness"].values())
-                if p.name in SmogonSets.raw_pkmn_sets
-                and len(SmogonSets.raw_pkmn_sets[p.name]["effectiveness"]) > 0
-                else 0,
-            )
-            for p in battle.user.reserve
-            if p.index not in [choice_digit_a, choice_digit_b]
-            and p.name not in constants.RESTRICTED_POKEMON
-        ],
-        key=lambda x: x[2],
-        reverse=True,
-    )
-
-    additional_choices = []
+    lead_indices = []
+    take_in_reserve_indices = []
     for pkmn in battle.user.reserve:
-        if (
-            pkmn.index not in [choice_digit_a, choice_digit_b]
-            and pkmn.name in constants.RESTRICTED_POKEMON
-        ):
-            additional_choices.append((pkmn.name, pkmn.index, 0))
+        if pkmn.name in [faint_1, faint_2]:
+            logger.info(f"Setting {pkmn.name} as fainted as it is not chosen")
+            pkmn.hp = 0
+            pkmn.name = "none"  # poke-engine uses none to identify pokemon that are not in the battle
+        elif pkmn.name in [switch_a, switch_b]:
+            logger.info(f"Choosing {pkmn.name} (index={pkmn.index}) as lead")
+            lead_indices.append(pkmn.index)
+        else:
+            logger.info(f"Taking {pkmn.name} (index={pkmn.index}) as reserve")
+            take_in_reserve_indices.append(pkmn.index)
 
-    while len(additional_choices) < 2:
-        additional_choices.append(remaining_pkmn_by_effectiveness.pop(0))
-
-    choice_digit_reserve_1 = additional_choices[0][1]
-    choice_digit_reserve_2 = additional_choices[1][1]
-    logger.info(
-        "Chosen reserve pokemon: {}, {}".format(
-            additional_choices[0][0], additional_choices[1][0]
-        )
-    )
     message = [
         "/team {}{}{}{}|{}".format(
-            choice_digit_a,
-            choice_digit_b,
-            choice_digit_reserve_1,
-            choice_digit_reserve_2,
+            lead_indices[0],
+            lead_indices[1],
+            take_in_reserve_indices[0],
+            take_in_reserve_indices[1],
             battle.rqid,
         )
     ]
-    chosen_pkmn = [
-        additional_choices[0][0],
-        additional_choices[1][0],
-        pkmn_name_a,
-        pkmn_name_b,
-    ]
-    logger.info(
-        "Chosen pokemon: {}, {}, {}, {}".format(
-            additional_choices[0][0],
-            additional_choices[1][0],
-            pkmn_name_a,
-            pkmn_name_b,
-        )
-    )
-    for pkmn in battle.user.reserve:
-        if pkmn.name not in chosen_pkmn:
-            logger.info("Setting {} as fainted as it is not chosen".format(pkmn.name))
-            pkmn.hp = 0
-            pkmn.name = "none"  # poke-engine uses none to identify pokemon that are not in the battle
-
     await ps_websocket_client.send_message(battle.battle_tag, message)
 
 
@@ -224,9 +183,11 @@ async def start_standard_battle(
     ps_websocket_client: PSWebsocketClient,
     pokemon_battle_type,
     first_battle,
+    all_battle_data,
 ):
     battle, msg = await start_battle_common(ps_websocket_client, pokemon_battle_type)
     battle.battle_type = constants.STANDARD_BATTLE
+    battle.previous_battle_data = all_battle_data
 
     while constants.START_TEAM_PREVIEW not in msg:
         msg = await ps_websocket_client.receive_message()
@@ -253,9 +214,11 @@ async def start_standard_battle(
     return battle
 
 
-async def start_battle(ps_websocket_client, pokemon_battle_type, first_battle):
+async def start_battle(
+    ps_websocket_client, pokemon_battle_type, first_battle, all_battle_data
+):
     battle = await start_standard_battle(
-        ps_websocket_client, pokemon_battle_type, first_battle
+        ps_websocket_client, pokemon_battle_type, first_battle, all_battle_data
     )
 
     await ps_websocket_client.send_message(battle.battle_tag, ["/timer on"])
@@ -264,9 +227,15 @@ async def start_battle(ps_websocket_client, pokemon_battle_type, first_battle):
 
 
 async def pokemon_battle(
-    ps_websocket_client, pokemon_battle_type, best_of_3_room_name, first_battle
+    ps_websocket_client,
+    pokemon_battle_type,
+    best_of_3_room_name,
+    first_battle,
+    all_battle_data: list[BattleData],
 ):
-    battle = await start_battle(ps_websocket_client, pokemon_battle_type, first_battle)
+    battle = await start_battle(
+        ps_websocket_client, pokemon_battle_type, first_battle, all_battle_data
+    )
     while True:
         msg = await ps_websocket_client.receive_message()
         if battle_is_finished(battle.battle_tag, msg):
@@ -282,7 +251,7 @@ async def pokemon_battle(
                 await ps_websocket_client.save_replay(battle.battle_tag)
             await ps_websocket_client.leave_battle(battle.battle_tag)
             SmogonSets.save_speed_ranges(battle)
-            return winner, False
+            return winner, False, battle.battle_data
         elif bo3_is_finished(best_of_3_room_name, msg):
             if constants.WIN_STRING in msg:
                 winner = msg.split(constants.WIN_STRING)[-1].split("\n")[0].strip()
@@ -295,7 +264,7 @@ async def pokemon_battle(
             ):
                 await ps_websocket_client.save_replay(battle.battle_tag)
             await ps_websocket_client.leave_battle(battle.battle_tag)
-            return winner, True
+            return winner, True, battle.battle_data
         else:
             action_required = await async_update_battle(battle, msg)
             if action_required and not battle.wait:

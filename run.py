@@ -94,21 +94,26 @@ async def run_foul_play():
         best_of_3_room_name = await _get_best_of_3_room_name(ps_websocket_client)
         logger.info("Bo3 room name: {}".format(best_of_3_room_name))
         first_battle = True
+        all_battle_data = []
         while best_of_3_wins < 2 and best_of_3_loss < 2:
-            winner, bo3_done = await pokemon_battle(
+            winner, bo3_done, battle_data = await pokemon_battle(
                 ps_websocket_client,
                 FoulPlayConfig.pokemon_format,
                 best_of_3_room_name,
                 first_battle,
+                all_battle_data,
             )
             first_battle = False
             if winner == FoulPlayConfig.username:
+                battle_data.win = True
                 best_of_3_wins += 1
                 logger.info("Won with team: {}".format(file_name))
             else:
+                battle_data.win = False
                 best_of_3_loss += 1
                 logger.info("Lost with team: {}".format(file_name))
 
+            all_battle_data.append(battle_data)
             logger.info("This Set W: {}\tL: {}".format(best_of_3_wins, best_of_3_loss))
             check_dictionaries_are_unmodified(original_pokedex, original_move_json)
 

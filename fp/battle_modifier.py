@@ -404,6 +404,14 @@ def switch_or_drag(battle, split_msg, switch_or_drag="switch"):
 
     slot.active = pkmn
 
+    if side_name == "opponent":
+        if len(battle.battle_data.opponent_leads) < 2:
+            battle.battle_data.opponent_leads.add(pkmn.name)
+            logger.info(f"Added {pkmn.name} as opponent lead")
+        elif pkmn.name not in battle.battle_data.opponent_leads:
+            battle.battle_data.opponent_picks.add(pkmn.name)
+            logger.info(f"Added {pkmn.name} as opponent pick")
+
     # zacian-crowned is technically still zacian before switching in for the first time
     # this is handled by set-prediction for the opponent, but for the bot's pkmn we
     # need to re-apply the stats that the P.S. server sends us because prior to the first
