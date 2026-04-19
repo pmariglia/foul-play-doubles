@@ -7829,8 +7829,7 @@
             "speed": 80
         },
         "abilities": {
-            "0": "Overgrow",
-            "H": "Leaf Guard"
+            "0": "Mega Sol"
         },
         "heightm": 2.4,
         "weightkg": 201,
@@ -8110,8 +8109,7 @@
             "speed": 78
         },
         "abilities": {
-            "0": "Torrent",
-            "H": "Sheer Force"
+            "0": "Dragonize"
         },
         "heightm": 2.3,
         "weightkg": 108.8,
@@ -23874,8 +23872,7 @@
             "speed": 75
         },
         "abilities": {
-            "0": "Blaze",
-            "H": "Reckless"
+            "0": "Mold Breaker"
         },
         "heightm": 1.8,
         "weightkg": 180.3,
@@ -29872,8 +29869,7 @@
             "speed": 44
         },
         "abilities": {
-            "0": "Overgrow",
-            "H": "Bulletproof"
+            "0": "Bulletproof"
         },
         "heightm": 1.6,
         "weightkg": 90,
@@ -30011,8 +30007,7 @@
             "speed": 134
         },
         "abilities": {
-            "0": "Blaze",
-            "H": "Magician"
+            "0": "Levitate"
         },
         "heightm": 1.5,
         "weightkg": 39,
@@ -30215,8 +30210,7 @@
             "speed": 142
         },
         "abilities": {
-            "0": "Torrent",
-            "H": "Protean"
+            "0": "Protean"
         },
         "heightm": 1.5,
         "weightkg": 40,
