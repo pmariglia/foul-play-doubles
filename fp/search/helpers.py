@@ -27,6 +27,11 @@ def format_decision(battle, slot, decision):
             decision = decision.removesuffix(",tera")
             tera = True
 
+        mega = False
+        if decision.endswith(",mega"):
+            decision = decision.removesuffix(",mega")
+            mega = True
+
         decision_split = decision.split(",")
         decision = decision_split[0]
         if len(decision_split) == 3:
@@ -65,15 +70,12 @@ def format_decision(battle, slot, decision):
             decision = "recharge 1"
 
         message = "move {}".format(decision)
-        if slot.active.can_mega_evo:
-            message = "{} {}".format(message, constants.MEGA)
-        elif slot.active.can_ultra_burst:
-            message = "{} {}".format(message, constants.ULTRA_BURST)
 
         # only dynamax on last pokemon
         # if slot.active.can_dynamax and all(p.hp == 0 for p in battle.user.reserve):
         #     message = "{} {}".format(message, constants.DYNAMAX)
-
+        if mega:
+            message = "{} {}".format(message, constants.MEGA)
         if tera:
             message = "{} {}".format(message, constants.TERASTALLIZE)
 
