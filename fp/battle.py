@@ -708,13 +708,6 @@ class Pokemon:
             pkmn.add_move(move)
         return pkmn
 
-    def get_base_species(self):
-        base_species = pokedex[self.name].get("baseSpecies")
-        if base_species:
-            return normalize_name(base_species)
-        else:
-            return self.name
-
     def has_type(self, pkmn_type: str):
         if self.terastallized and self.tera_type != "stellar":
             return pkmn_type == self.tera_type
