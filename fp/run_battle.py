@@ -184,8 +184,10 @@ async def start_standard_battle(
     pokemon_battle_type,
     first_battle,
     all_battle_data,
+    team_dict,
 ):
     battle, msg = await start_battle_common(ps_websocket_client, pokemon_battle_type)
+    battle.user.team_dict = team_dict
     battle.battle_type = constants.STANDARD_BATTLE
     battle.previous_battle_data = all_battle_data
 
@@ -217,10 +219,14 @@ async def start_standard_battle(
 
 
 async def start_battle(
-    ps_websocket_client, pokemon_battle_type, first_battle, all_battle_data
+    ps_websocket_client, pokemon_battle_type, first_battle, all_battle_data, team_dict
 ):
     battle = await start_standard_battle(
-        ps_websocket_client, pokemon_battle_type, first_battle, all_battle_data
+        ps_websocket_client,
+        pokemon_battle_type,
+        first_battle,
+        all_battle_data,
+        team_dict,
     )
 
     await ps_websocket_client.send_message(battle.battle_tag, ["/timer on"])
@@ -234,9 +240,14 @@ async def pokemon_battle(
     best_of_3_room_name,
     first_battle,
     all_battle_data: list[BattleData],
+    team_dict,
 ):
     battle = await start_battle(
-        ps_websocket_client, pokemon_battle_type, first_battle, all_battle_data
+        ps_websocket_client,
+        pokemon_battle_type,
+        first_battle,
+        all_battle_data,
+        team_dict,
     )
     while True:
         msg = await ps_websocket_client.receive_message()

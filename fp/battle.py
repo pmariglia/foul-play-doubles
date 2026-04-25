@@ -339,6 +339,8 @@ class Battler:
         self.reserve = []
         self.side_conditions = defaultdict(lambda: 0)
 
+        self.team_dict = None
+
     def from_packed_string(self, packed_string: str):
         team_dict = packed_to_dict(packed_string)
         for pkmn in team_dict:
@@ -586,12 +588,27 @@ class Battler:
                     move_name = "behemothbash"
                 pkmn.add_move(move_name)
 
-        # if there is no active pokemon, we do not want to look through it's moves
-        if constants.ACTIVE not in request_json:
-            return
+        # if there are active pokemon, we want to look their it's moves
+        if constants.ACTIVE in request_json:
+            self.slot_a.initialize_user_active_from_request_json(request_json, 0)
+            self.slot_b.initialize_user_active_from_request_json(request_json, 1)
 
-        self.slot_a.initialize_user_active_from_request_json(request_json, 0)
-        self.slot_b.initialize_user_active_from_request_json(request_json, 1)
+        # if a team_dict exists, meaning we are playing a format where we selected our own team,
+        # set the nature/evs for each pokmeon
+        if self.team_dict is not None:
+            for pkmn in [self.slot_a.active, self.slot_b.active] + self.reserve:
+                team_dict_pkmn = next(
+                    p for p in self.team_dict if p["species"] == pkmn.name
+                )
+                pkmn.nature = team_dict_pkmn["nature"] or "serious"
+                pkmn.evs = (
+                    int(team_dict_pkmn["evs"]["hp"] or 0),
+                    int(team_dict_pkmn["evs"]["atk"] or 0),
+                    int(team_dict_pkmn["evs"]["def"] or 0),
+                    int(team_dict_pkmn["evs"]["spa"] or 0),
+                    int(team_dict_pkmn["evs"]["spd"] or 0),
+                    int(team_dict_pkmn["evs"]["spe"] or 0),
+                )
 
 
 class Pokemon:
