@@ -154,7 +154,6 @@ def packed_to_dict(packed_string):
         this_pkmn["moves"] = [normalize_name(move) for move in moves.split(",") if move]
         this_pkmn["tera_type"] = normalize_name(rest.split(",")[-1])
         this_pkmn["level"] = int(level)
-        assert this_pkmn["tera_type"]
         ret.append(this_pkmn)
 
     return ret

@@ -203,7 +203,9 @@ async def start_standard_battle(
     battle.during_team_preview()
 
     if first_battle:
-        SmogonSets.initialize(pokemon_battle_type, battle)
+        SmogonSets.initialize(
+            FoulPlayConfig.smogon_stats or pokemon_battle_type, battle
+        )
 
     SmogonSets.load_speed_ranges(battle)
     battle.user.reserve.insert(0, battle.user.slot_a.active)
