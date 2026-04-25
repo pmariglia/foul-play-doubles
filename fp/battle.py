@@ -816,7 +816,18 @@ class Move:
             )
         move_json = all_move_json[name]
         self.name = name
-        self.max_pp = int(move_json.get(constants.PP) * 1.6)
+        if FoulPlayConfig.pokemon_format.startswith("gen9champions"):
+            match move_json.get(constants.PP):
+                case 5:
+                    self.max_pp = 8
+                case 10:
+                    self.max_pp = 12
+                case 15:
+                    self.max_pp = 16
+                case _:
+                    self.max_pp = 20
+        else:
+            self.max_pp = int(move_json.get(constants.PP) * 1.6)
 
         self.disabled = False
         self.can_z = False
