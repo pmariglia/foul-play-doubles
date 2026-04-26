@@ -126,6 +126,7 @@ def pokemon_to_poke_engine_pkmn(pkmn: Pokemon):
         weight_kg=float(pokedex[pkmn.name][constants.WEIGHT]),
         moves=pkmn_moves,
         tera_type=pkmn.tera_type or "typeless",
+        mega_evolved=pkmn.is_mega,
         terastallized=pkmn.terastallized,
         times_attacked=pkmn.times_attacked,
         stellar_boosted_types=pkmn.stellar_boosted_types,
