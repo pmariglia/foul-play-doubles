@@ -1,6 +1,9 @@
 import random
 import os
+import logging
 from .team_converter import export_to_packed, export_to_dict
+
+logger = logging.getLogger(__name__)
 
 TEAM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "teams")
 
@@ -38,11 +41,13 @@ def load_team(name):
     else:
         raise ValueError("Path must be file or dir: {}".format(name))
 
+    file_name = os.path.basename(file_path)
+    logger.info(f"Selected team {file_name}")
     with open(file_path, "r") as f:
         team_export = f.read()
 
     return (
         export_to_packed(team_export),
         export_to_dict(team_export),
-        os.path.basename(file_path),
+        file_name,
     )

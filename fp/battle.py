@@ -593,22 +593,21 @@ class Battler:
             self.slot_a.initialize_user_active_from_request_json(request_json, 0)
             self.slot_b.initialize_user_active_from_request_json(request_json, 1)
 
-        # if a team_dict exists, meaning we are playing a format where we selected our own team,
-        # set the nature/evs for each pokmeon
-        if self.team_dict is not None:
-            for pkmn in [self.slot_a.active, self.slot_b.active] + self.reserve:
-                team_dict_pkmn = next(
-                    p for p in self.team_dict if p["species"] == pkmn.name
-                )
-                pkmn.nature = team_dict_pkmn["nature"] or "serious"
-                pkmn.evs = (
-                    int(team_dict_pkmn["evs"]["hp"] or 0),
-                    int(team_dict_pkmn["evs"]["atk"] or 0),
-                    int(team_dict_pkmn["evs"]["def"] or 0),
-                    int(team_dict_pkmn["evs"]["spa"] or 0),
-                    int(team_dict_pkmn["evs"]["spd"] or 0),
-                    int(team_dict_pkmn["evs"]["spe"] or 0),
-                )
+        # self.team_dict should always exist (this bot only plays doubles bo3)
+        for index, pkmn in enumerate(
+            [self.slot_a.active, self.slot_b.active] + self.reserve
+        ):
+            team_dict_pkmn = self.team_dict[index]
+            pkmn.nature = team_dict_pkmn["nature"] or "serious"
+            pkmn.evs = (
+                int(team_dict_pkmn["evs"]["hp"] or 0),
+                int(team_dict_pkmn["evs"]["atk"] or 0),
+                int(team_dict_pkmn["evs"]["def"] or 0),
+                int(team_dict_pkmn["evs"]["spa"] or 0),
+                int(team_dict_pkmn["evs"]["spd"] or 0),
+                int(team_dict_pkmn["evs"]["spe"] or 0),
+            )
+            logger.debug(f"{pkmn.name}, nature: {pkmn.nature}, evs: {pkmn.evs}")
 
 
 class Pokemon:
