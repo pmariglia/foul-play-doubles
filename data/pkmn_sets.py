@@ -22,6 +22,8 @@ from fp.helpers import normalize_name
 
 PWD = os.path.dirname(os.path.abspath(__file__))
 SMOGON_CACHE_DIR = os.path.join(PWD, "smogon_stats_cache")
+CUSTOM_SET_DATA = os.path.join(PWD, "pkmn_sets_cache", "custom_set_data.json")
+
 os.makedirs(SMOGON_CACHE_DIR, exist_ok=True)
 
 OTHER_STRING = "other"
@@ -65,29 +67,29 @@ def get_default_sets():
     ]
     evs = [
         # bulky
-        (252, 0, 0, 0, 4, 252),
-        (252, 0, 252, 0, 4, 0),
-        (252, 0, 200, 0, 56, 0),
-        (252, 0, 4, 0, 252, 0),
-        (252, 0, 56, 0, 200, 0),
-        (200, 0, 0, 0, 56, 252),
-        (200, 0, 56, 0, 0, 252),
-        (200, 0, 252, 0, 56, 0),
-        (200, 0, 56, 0, 252, 0),
+        (32, 0, 0, 0, 4, 32),
+        (32, 0, 32, 0, 4, 0),
+        (32, 0, 24, 0, 6, 0),
+        (32, 0, 4, 0, 32, 0),
+        (32, 0, 6, 0, 24, 0),
+        (24, 0, 0, 0, 6, 32),
+        (24, 0, 6, 0, 0, 32),
+        (24, 0, 32, 0, 6, 0),
+        (24, 0, 6, 0, 32, 0),
         # physically offensive
-        (0, 252, 0, 0, 4, 252),
-        (52, 252, 0, 0, 4, 200),
-        (104, 252, 0, 0, 4, 200),
-        (52, 200, 0, 0, 4, 252),
-        (104, 200, 0, 0, 4, 200),
-        (156, 200, 0, 0, 4, 200),
+        (0, 32, 0, 0, 4, 32),
+        (6, 32, 0, 0, 4, 24),
+        (13, 32, 0, 0, 4, 24),
+        (6, 24, 0, 0, 4, 32),
+        (13, 24, 0, 0, 4, 24),
+        (19, 24, 0, 0, 4, 24),
         # specially offensive
-        (0, 0, 0, 252, 4, 252),
-        (52, 0, 0, 252, 4, 200),
-        (104, 0, 0, 252, 4, 148),
-        (52, 0, 0, 200, 4, 252),
-        (104, 0, 0, 200, 4, 200),
-        (156, 0, 0, 200, 4, 148),
+        (0, 0, 0, 32, 4, 32),
+        (6, 0, 0, 32, 4, 24),
+        (13, 0, 0, 32, 4, 18),
+        (6, 0, 0, 24, 4, 32),
+        (13, 0, 0, 24, 4, 24),
+        (19, 0, 0, 24, 4, 18),
     ]
 
     ret = []
@@ -134,6 +136,18 @@ class PokemonSpread:
             nature=self.nature,
         )
         return pkmn.speed_range.min <= stats[constants.SPEED] <= pkmn.speed_range.max
+
+    def alike(self, other: PokemonSpread) -> bool:
+        if not isinstance(other, PokemonSpread):
+            return NotImplemented
+
+        if self.nature != other.nature:
+            return False
+
+        diff = [abs(i - j) for i, j in zip(self.evs, other.evs)]
+
+        # 8 is arbitrarily chosen as the threshold for EVs to be "alike"
+        return all(v <= 8 for v in diff)
 
 
 def find_pkmn(pkmn_name: str, pkmn_list: list[Pokemon]):
@@ -316,8 +330,6 @@ class _SmogonSets:
                 )
                 if self._pokemon_set_makes_sense(pkmn, pkmn_set):
                     self.pkmn_sets[pkmn_name].append(pkmn_set)
-            self.pkmn_sets[pkmn_name].sort(key=lambda x: x.count, reverse=True)
-            self.pkmn_speed_ranges[pkmn_name] = StatRange(min=0, max=float("inf"))
 
     def save_speed_ranges(self, battle: Battle):
         for pkmn in battle.opponent.reserve + [
@@ -386,7 +398,49 @@ class _SmogonSets:
                     smogon_stats_url, pkmn_names
                 )
 
-        self._initialize(self.raw_pkmn_sets, opponent)
+        # temp commented out until smogon sets are reliable for champions
+        # self._initialize(self.raw_pkmn_sets, opponent)
+        self.load_custom_set_data(opponent, pkmn_names)
+
+        for pkmn_name in self.pkmn_sets:
+            self.pkmn_sets[pkmn_name].sort(key=lambda x: x.count, reverse=True)
+            self.pkmn_speed_ranges[pkmn_name] = StatRange(min=0, max=float("inf"))
+
+    def get_alike_pkmn_spread(
+        self, pkmn_name: str, pkmn_spread: PokemonSpread
+    ) -> PokemonSpread | None:
+        for ps in self.pkmn_sets.get(pkmn_name, {}):
+            if ps.alike(pkmn_spread):
+                return ps
+        return None
+
+    def load_custom_set_data(self, opponent: Battler, pkmn_names: set[str]):
+        with open(CUSTOM_SET_DATA, "r") as f:
+            data = json.load(f)
+
+        data = {k: v for (k, v) in data.items() if k in pkmn_names}
+        for pkmn in opponent.reserve:
+            pkmn_name = normalize_name(pkmn.name)
+            if pkmn_name not in data:
+                logger.warning(f"Nothing found for {pkmn_name} in custom sets")
+                continue
+            this_pkmn_data = data[pkmn_name]
+            for pkmn_set in this_pkmn_data:
+                pkmn_spread = PokemonSpread(
+                    nature=pkmn_set["nature"],
+                    evs=tuple(int(v) if v else 0 for v in pkmn_set["evs"].values()),
+                    count=1,
+                )
+                if self._pokemon_set_makes_sense(pkmn, pkmn_spread):
+                    existing_pkmn_spread = self.get_alike_pkmn_spread(
+                        pkmn_name, pkmn_spread
+                    )
+                    if existing_pkmn_spread is not None:
+                        existing_pkmn_spread.count += 1
+                    elif pkmn_name not in self.pkmn_sets:
+                        self.pkmn_sets[pkmn_name] = [pkmn_spread]
+                    else:
+                        self.pkmn_sets[pkmn_name].append(pkmn_spread)
 
     def get_random_spread(self, pkmn: Pokemon) -> Optional[PokemonSpread]:
         if not self.pkmn_sets:

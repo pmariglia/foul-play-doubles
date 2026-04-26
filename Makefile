@@ -24,4 +24,4 @@ poke_engine_local:
 	pip uninstall -y poke-engine-doubles && pip install -v --force-reinstall --no-cache-dir ../poke-engine-doubles/poke-engine-py --config-settings="build-args=--features poke-engine/$(GEN) --no-default-features"
 
 create_set_data:
-	PYTHONPATH=. python data/scripts/create-set-data.py $(FOLDERS)
+	PYTHONPATH=. python data/scripts/create_set_data.py $(FOLDERS)

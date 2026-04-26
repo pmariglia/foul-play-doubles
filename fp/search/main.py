@@ -76,18 +76,6 @@ def get_battles_for_team_preview(battle: Battle, num_battles: int) -> list[Battl
     return battles
 
 
-def convert_evs_to_stat_points(evs):
-    stat_points = []
-    for ev in evs:
-        this_stat_point = 0
-        if ev >= 4:
-            ev -= 4
-            this_stat_point = 1 + (ev // 8)
-        stat_points.append(this_stat_point)
-
-    return stat_points
-
-
 def populate_spreads(battle: Battle, index: int):
     logger.info("Battle {}".format(index))
     for pkmn in [
@@ -102,15 +90,9 @@ def populate_spreads(battle: Battle, index: int):
             logger.warning("\tNo spread found for {}".format(pkmn.name))
         else:
             pkmn.set_spread(pkmn_spread.nature, pkmn_spread.evs)
-
-            # converting evs to stat points like this probably only temporary until
-            # data starts reporting stat points as they exist in champions
-            stat_points = convert_evs_to_stat_points(pkmn_spread.evs)
-            pkmn.evs = stat_points
-
             logger.info(
                 "\tPredicted Set: {} {} for {}".format(
-                    pkmn_spread.nature.ljust(7), str(stat_points).ljust(25), pkmn.name
+                    pkmn_spread.nature.ljust(7), str(pkmn.evs).ljust(25), pkmn.name
                 )
             )
 

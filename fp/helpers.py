@@ -113,6 +113,20 @@ def _calculate_stats_gen_1_2(base_stats, level):
     return new_stats
 
 
+def _calculate_stats_champions(base_stats, evs, nature):
+    new_stats = {
+        constants.HITPOINTS: base_stats[constants.HITPOINTS] + evs[0] + 75,
+        constants.ATTACK: base_stats[constants.ATTACK] + evs[1] + 20,
+        constants.DEFENSE: base_stats[constants.DEFENSE] + evs[2] + 20,
+        constants.SPECIAL_ATTACK: base_stats[constants.SPECIAL_ATTACK] + evs[3] + 20,
+        constants.SPECIAL_DEFENSE: base_stats[constants.SPECIAL_DEFENSE] + evs[4] + 20,
+        constants.SPEED: base_stats[constants.SPEED] + evs[5] + 20,
+    }
+    new_stats = update_stats_from_nature(new_stats, nature)
+    new_stats = {k: int(v) for k, v in new_stats.items()}
+    return new_stats
+
+
 def _calculate_stats(base_stats, level, ivs=(31,) * 6, evs=(85,) * 6, nature="serious"):
     new_stats = dict()
 
@@ -156,6 +170,8 @@ def _calculate_stats(base_stats, level, ivs=(31,) * 6, evs=(85,) * 6, nature="se
 def calculate_stats(base_stats, level, ivs=(31,) * 6, evs=(85,) * 6, nature="serious"):
     if any(g in FoulPlayConfig.pokemon_format for g in ["gen1", "gen2"]):
         return _calculate_stats_gen_1_2(base_stats, level)
+    elif FoulPlayConfig.pokemon_format.startswith("gen9champions"):
+        return _calculate_stats_champions(base_stats, evs, nature)
     else:
         return _calculate_stats(base_stats, level, ivs, evs, nature)
 
