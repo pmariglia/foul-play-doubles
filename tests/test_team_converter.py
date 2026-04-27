@@ -38,7 +38,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar @ Leftovers"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["item"] = "leftovers"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
@@ -47,7 +47,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar\n" "Level: 5  "
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["level"] = "5"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
@@ -56,7 +56,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Mr. Mime"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Mr. Mime"
+        self.expected_pkmn_dict["species"] = "mrmime"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
 
@@ -64,7 +64,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Mr. Mime (M)"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Mr. Mime"
+        self.expected_pkmn_dict["species"] = "mrmime"
         self.expected_pkmn_dict["gender"] = "M"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
@@ -73,7 +73,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Mr. Mime (M) @ Leftovers"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Mr. Mime"
+        self.expected_pkmn_dict["species"] = "mrmime"
         self.expected_pkmn_dict["gender"] = "M"
         self.expected_pkmn_dict["item"] = "leftovers"
 
@@ -83,7 +83,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
 
@@ -91,7 +91,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar (M) @ Leftovers"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["item"] = "leftovers"
         self.expected_pkmn_dict["gender"] = "M"
 
@@ -101,7 +101,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar (M)"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["gender"] = "M"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
@@ -110,7 +110,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar\n" "EVs: 1 Atk / 2 Def / 3 Spa / 4 SpD / 5 Spe"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["evs"]["atk"] = "1"
         self.expected_pkmn_dict["evs"]["def"] = "2"
         self.expected_pkmn_dict["evs"]["spa"] = "3"
@@ -123,7 +123,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar\n" "Ability: Sand Stream"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["ability"] = "sandstream"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
@@ -132,7 +132,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar\n" "Adamant Nature"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["nature"] = "adamant"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
@@ -141,7 +141,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar\n" "- Crunch\n" "- Stone Edge\n" "- Earthquake"
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["moves"] = [
             "crunch",
             "stoneedge",
@@ -161,7 +161,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         )
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["ability"] = "sandstream"
         self.expected_pkmn_dict["nature"] = "adamant"
         self.expected_pkmn_dict["moves"] = [
@@ -177,7 +177,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
         self.expected_pkmn_dict["name"] = "Ty Ty"
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
 
@@ -187,7 +187,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         )
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["nature"] = "adamant"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
@@ -198,7 +198,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         )
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["nature"] = "adamant"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
@@ -207,7 +207,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar\n" "Adamant Nature \r "
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["nature"] = "adamant"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)
@@ -216,7 +216,7 @@ class TestSinglePokemonExportToDict(unittest.TestCase):
         export_string = "Tyranitar\n" "Tera Type: Water \r "
 
         pkmn_dict = single_pokemon_export_to_dict(export_string)
-        self.expected_pkmn_dict["species"] = "Tyranitar"
+        self.expected_pkmn_dict["species"] = "tyranitar"
         self.expected_pkmn_dict["tera_type"] = "water"
 
         self.assertEqual(self.expected_pkmn_dict, pkmn_dict)

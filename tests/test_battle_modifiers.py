@@ -1186,6 +1186,48 @@ class TestMove(unittest.TestCase):
 
         self.battle.user.slot_a.active = Pokemon("clefable", 100)
 
+    def test_swaps_zoroark_when_opponent_uses_move_it_cannot_have(self):
+        self.battle.opponent.slot_a.active.moves = [
+            Move("watergun"),
+            Move("ember"),
+            Move("screech"),
+            Move("fly"),
+        ]
+        zoroark_hisui = Pokemon("zoroarkhisui", 50)
+        zoroark_hisui.moves = [
+            Move("tackle"),
+            Move("ember"),
+            Move("screech"),
+            Move("fly"),
+        ]
+        self.battle.opponent.reserve = [zoroark_hisui]
+        split_msg = ["", "move", "p2a: Caterpie", "Tackle", "p1a: Caterpie"]
+        move(self.battle, split_msg)
+        self.assertEqual(zoroark_hisui, self.battle.opponent.slot_a.active)
+        self.assertIn(self.opponent_active, self.battle.opponent.reserve)
+        self.assertNotIn(zoroark_hisui, self.battle.opponent.reserve)
+
+    def test_does_not_swap_zoroark_when_move_used_is_on_pkmn(self):
+        self.battle.opponent.slot_a.active.moves = [
+            Move("tackle"),
+            Move("ember"),
+            Move("screech"),
+            Move("fly"),
+        ]
+        zoroark_hisui = Pokemon("zoroarkhisui", 50)
+        zoroark_hisui.moves = [
+            Move("tackle"),
+            Move("ember"),
+            Move("screech"),
+            Move("fly"),
+        ]
+        self.battle.opponent.reserve = [zoroark_hisui]
+        split_msg = ["", "move", "p2a: Caterpie", "Tackle", "p1a: Caterpie"]
+        move(self.battle, split_msg)
+        self.assertNotEqual(zoroark_hisui, self.battle.opponent.slot_a.active)
+        self.assertNotIn(self.opponent_active, self.battle.opponent.reserve)
+        self.assertIn(zoroark_hisui, self.battle.opponent.reserve)
+
     def test_sets_healing_wish_side_condition_when_healing_wish_is_used(self):
         split_msg = ["", "move", "p2a: Caterpie", "Healing Wish", "p2a: Caterpie"]
         move(self.battle, split_msg)
