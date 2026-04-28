@@ -55,6 +55,8 @@ for folder in args.folders:
                 if is_valid(pkmn_dict):
                     result[pkmn_dict["species"]].append(pkmn_dict)
                     pokemon_parsed += 1
+                else:
+                    print(f"Invalid: {file}")
 
 with open(OUT_FILE, "w") as f:
     json.dump(result, f, indent=2)
