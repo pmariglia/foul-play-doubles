@@ -20,6 +20,7 @@ from fp.battle_modifier import (
     sidestart,
     get_damage_dealt,
     faint,
+    mega,
 )
 from fp.battle_modifier import terastallize
 from fp.battle_modifier import activate
@@ -1173,6 +1174,25 @@ class TestClearAllBoosts(unittest.TestCase):
         self.assertEqual(
             0, self.battle.opponent.slot_a.active.boosts[constants.DEFENSE]
         )
+
+
+class TestMega(unittest.TestCase):
+    def setUp(self):
+        self.battle = Battle(None)
+        self.battle.user.name = "p1"
+        self.battle.opponent.name = "p2"
+
+        self.opponent_active = Pokemon("caterpie", 100)
+        self.battle.opponent.slot_a.active = self.opponent_active
+
+        self.battle.user.slot_a.active = Pokemon("clefable", 100)
+
+    def test_mega_resets_ability(self):
+        self.battle.opponent.slot_a.active.name = "meganiummega"
+        split_msg = ["", "-mega", "p2a: Meganium", "Meganium", "Meganiumite"]
+        mega(self.battle, split_msg)
+        self.assertTrue(self.battle.opponent.slot_a.active.is_mega)
+        self.assertEqual("megasol", self.battle.opponent.slot_a.active.ability)
 
 
 class TestMove(unittest.TestCase):

@@ -421,6 +421,8 @@ class _SmogonSets:
         data = {k: v for (k, v) in data.items() if k in pkmn_names}
         for pkmn in opponent.reserve:
             pkmn_name = normalize_name(pkmn.name)
+            self.pkmn_sets[pkmn_name] = get_default_sets()
+            logger.info(f"Initialized default sets for {pkmn_name}")
             if pkmn_name not in data:
                 logger.warning(f"Nothing found for {pkmn_name} in custom sets")
                 continue

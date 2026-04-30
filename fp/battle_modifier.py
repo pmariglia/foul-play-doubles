@@ -2186,6 +2186,14 @@ def mega(battle, split_msg):
     slot.active.is_mega = True
     logger.info("Mega-Pokemon: {}".format(slot.active.name))
 
+    # this works because `detailschance` always comes before `-mega`,
+    # meaning slot.active.name will already be updated
+    new_ability = pokedex[slot.active.name][constants.ABILITIES][
+        "0"
+    ]  # megas always have 1 ability
+    slot.active.ability = normalize_name(new_ability)
+    logger.info(f"Set {slot.active.name}'s ability to {slot.active.ability}")
+
 
 def transform(battle, split_msg):
     ...
