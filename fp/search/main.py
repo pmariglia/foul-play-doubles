@@ -143,7 +143,14 @@ def get_result_from_mcts(state: str, search_time_ms: int, index: int) -> MctsRes
 
 def get_default_team_preview_options() -> list[(int, int, int, int)]:
     pokemon_indices = [0, 1, 2, 3, 4, 5]
-    return [tuple(i) for i in combinations(pokemon_indices, 4)]
+    all_teams = [tuple(i) for i in combinations(pokemon_indices, 4)]
+    result = []
+    for team in all_teams:
+        all_leads = combinations(team, 2)
+        for lead in all_leads:
+            team_with_leads = lead + tuple([i for i in team if i not in lead])
+            result.append(team_with_leads)
+    return result
 
 
 def opponent_team_preview_side_filter(
