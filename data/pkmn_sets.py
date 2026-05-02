@@ -398,10 +398,8 @@ class _SmogonSets:
                     smogon_stats_url, pkmn_names
                 )
 
-        # temp commented out until smogon sets are reliable for champions
-        # self._initialize(self.raw_pkmn_sets, opponent)
+        self._initialize(self.raw_pkmn_sets, opponent)
         self.load_custom_set_data(opponent, pkmn_names)
-
         for pkmn_name in self.pkmn_sets:
             self.pkmn_sets[pkmn_name].sort(key=lambda x: x.count, reverse=True)
             self.pkmn_speed_ranges[pkmn_name] = StatRange(min=0, max=float("inf"))
