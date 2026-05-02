@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 
+from fp.battle import Pokemon
 from teams.team_converter import export_to_dict
 
 OUT_DIR = "data/pkmn_sets_cache"
@@ -51,6 +52,14 @@ def is_valid(pkmn_dict: dict) -> bool:
     return True
 
 
+def convert_mega(team: list[dict]):
+    for pkmn_dict in team:
+        pkmn = Pokemon(pkmn_dict["species"], 50)
+        pkmn.item = pkmn_dict["item"]
+        if pkmn.get_mega() is not None:
+            pkmn_dict["species"] = pkmn.get_mega()
+
+
 result = {}
 pokemon_parsed = 0
 for folder in args.folders:
@@ -60,6 +69,7 @@ for folder in args.folders:
             valid = True
             content = f.read()
             team_dict = export_to_dict(content)
+            convert_mega(team_dict)
             for pkmn_dict in team_dict:
                 if pkmn_dict["species"] not in result:
                     result[pkmn_dict["species"]] = []

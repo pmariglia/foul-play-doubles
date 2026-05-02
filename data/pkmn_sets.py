@@ -316,10 +316,11 @@ class _SmogonSets:
     def _initialize(self, raw_pkmn_sets: dict, opponent: Battler):
         for pkmn in opponent.reserve:
             pkmn_name = normalize_name(pkmn.name)
-            if pkmn_name not in raw_pkmn_sets:
+            mega_pknn_name = pkmn.get_mega()
+            if pkmn_name not in raw_pkmn_sets and mega_pknn_name not in raw_pkmn_sets:
                 logger.warning("No sets found for {} in smogon stats".format(pkmn_name))
                 continue
-            sets = raw_pkmn_sets[pkmn_name]
+            sets = raw_pkmn_sets.get(mega_pknn_name) or raw_pkmn_sets[pkmn_name]
             pkmn = find_pkmn(pkmn_name, opponent.reserve)
             self.pkmn_sets[pkmn_name] = []
             for spread in sets[SPREADS_STRING]:
@@ -379,7 +380,7 @@ class _SmogonSets:
     def initialize(self, pkmn_mode: str, battle: Battle):
         opponent = battle.opponent
         pkmn_names = set(
-            p.name
+            p.get_mega() or p.name
             for p in battle.opponent.reserve
             + battle.user.reserve
             + [battle.user.slot_a.active, battle.user.slot_b.active]
@@ -419,12 +420,13 @@ class _SmogonSets:
         data = {k: v for (k, v) in data.items() if k in pkmn_names}
         for pkmn in opponent.reserve:
             pkmn_name = normalize_name(pkmn.name)
+            mega_name = pkmn.get_mega()
             self.pkmn_sets[pkmn_name] = get_default_sets()
             logger.info(f"Initialized default sets for {pkmn_name}")
-            if pkmn_name not in data:
+            if pkmn_name not in data and mega_name and mega_name not in data:
                 logger.warning(f"Nothing found for {pkmn_name} in custom sets")
                 continue
-            this_pkmn_data = data[pkmn_name]
+            this_pkmn_data = data.get(mega_name) or data[pkmn_name]
             for pkmn_set in this_pkmn_data:
                 pkmn_spread = PokemonSpread(
                     nature=pkmn_set["nature"],
