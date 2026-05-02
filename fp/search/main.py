@@ -2,12 +2,13 @@ import logging
 import random
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
+from itertools import combinations
 
-from poke_engine.poke_engine import TeamPreviewFilters, TeamPreviewFilterSide
+from poke_engine.poke_engine import TeamPreviewFilters
 
 import constants
 from data.pkmn_sets import SmogonSets
-from fp.battle import Battle, Pokemon, BattleData
+from fp.battle import Battle, Pokemon, BattleData, Battler
 from config import FoulPlayConfig
 
 from poke_engine import (
@@ -140,22 +141,43 @@ def get_result_from_mcts(state: str, search_time_ms: int, index: int) -> MctsRes
     return res
 
 
+def get_default_team_preview_options() -> list[(int, int, int, int)]:
+    pokemon_indices = [0, 1, 2, 3, 4, 5]
+    return [tuple(i) for i in combinations(pokemon_indices, 4)]
+
+
 def opponent_team_preview_side_filter(
     battle: Battle, previous_battle_data: BattleData
-) -> TeamPreviewFilterSide:
-    side_filter = TeamPreviewFilterSide(
-        leads=[tuple(previous_battle_data.opponent_leads)],
-        valid_pokemon=list(previous_battle_data.opponent_picks)
-        + list(previous_battle_data.opponent_leads),
-    )
-    if len(side_filter.valid_pokemon) != 4:
-        side_filter.valid_pokemon = [p.name for p in battle.opponent.reserve]
+) -> list[(str, str, str, str)]:
+    def pkmn_to_indices(
+        battler: Battler, tp_selections: list[(str, str, str, str)]
+    ) -> list[(int, int, int, int)]:
+        name_to_index = {p.name: index for (index, p) in enumerate(battler.reserve)}
+        return [
+            tuple(name_to_index[name] for name in selection)
+            for selection in tp_selections
+        ]
 
-    return side_filter
+    pkmn_choices = tuple(previous_battle_data.opponent_leads)
+    for pkmn in list(previous_battle_data.opponent_picks):
+        pkmn_choices += (pkmn,)
+
+    if len(pkmn_choices) == 4:
+        return pkmn_to_indices(battle.opponent, [pkmn_choices])
+
+    remaining_pkmn = [
+        p.name for p in battle.opponent.reserve if p.name not in pkmn_choices
+    ]
+    slots_needed = 4 - len(pkmn_choices)
+
+    return pkmn_to_indices(
+        battle.opponent,
+        [pkmn_choices + combo for combo in combinations(remaining_pkmn, slots_needed)],
+    )
 
 
 def get_teampreview_filters(
-    battle: Battle, our_side_filters: TeamPreviewFilterSide, parallelism: int
+    battle: Battle, our_side_filters: list[(str, str, str, str)], parallelism: int
 ) -> list[TeamPreviewFilters]:
     previous_battle_data = battle.previous_battle_data
 
@@ -181,10 +203,7 @@ def get_teampreview_filters(
         result.append(
             TeamPreviewFilters(
                 side_one=our_side_filters,
-                side_two=TeamPreviewFilterSide(
-                    leads=None,
-                    valid_pokemon=[pkmn.name for pkmn in battle.opponent.reserve],
-                ),
+                side_two=get_default_team_preview_options(),
             )
         )
 
@@ -194,12 +213,7 @@ def get_teampreview_filters(
 def get_result_from_teampreview_mcts(
     state: str, search_time_ms: int, index: int, team_preview_filter: TeamPreviewFilters
 ) -> MctsResult:
-    logger.info(
-        f"Side Two Forced Leads ({index=}): {team_preview_filter.side_two.leads}"
-    )
-    logger.info(
-        f"Side Two Valid Pkmn ({index=}): {team_preview_filter.side_two.valid_pokemon}"
-    )
+    logger.info(f"Choices ({index=}): {team_preview_filter.debug_print()}")
     logger.debug("Calling with {} state: {}".format(index, state))
     poke_engine_state = PokeEngineState.from_string(state)
     res = monte_carlo_tree_search_team_preview(
@@ -249,9 +263,7 @@ def find_best_move_teampreview(battle):
 
     battles = get_battles_for_team_preview(battle, parallelism)
 
-    our_side_filter = TeamPreviewFilterSide(
-        valid_pokemon=[p.name for p in battle.user.reserve], leads=None
-    )
+    our_side_filter = get_default_team_preview_options()
     team_preview_filters = get_teampreview_filters(battle, our_side_filter, parallelism)
 
     num_battles = len(battles)

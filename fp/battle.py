@@ -624,6 +624,7 @@ class Pokemon:
         self.hidden_power_possibilities = set(POKEMON_TYPE_INDICES.keys())
         self.revealed = False
         self.stellar_boosted_types = []
+        self.index = None
 
         try:
             self.base_stats = pokedex[self.name][constants.BASESTATS]
