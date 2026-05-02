@@ -25,6 +25,16 @@ def try_parse_int(value, default=None):
 
 
 def is_valid(pkmn_dict: dict) -> bool:
+    if len(pkmn_dict["moves"]) != 4 and pkmn_dict["species"] != "ditto":
+        print(f"Invalid {pkmn_dict['species']}: '{pkmn_dict['moves']=}'")
+        return False
+
+    if not pkmn_dict["ability"] or not pkmn_dict["item"]:
+        print(
+            f"Invalid {pkmn_dict['species']}: '{pkmn_dict['ability']=}', '{pkmn_dict['item']=}'"
+        )
+        return False
+
     if not pkmn_dict["nature"]:
         print(f"Invalid Nature for {pkmn_dict['species']}: '{pkmn_dict['nature']}'")
         return False
@@ -47,6 +57,7 @@ for folder in args.folders:
     for file in os.listdir(folder):
         full_path = os.path.join(folder, file)
         with open(full_path, "r") as f:
+            valid = True
             content = f.read()
             team_dict = export_to_dict(content)
             for pkmn_dict in team_dict:
@@ -56,7 +67,10 @@ for folder in args.folders:
                     result[pkmn_dict["species"]].append(pkmn_dict)
                     pokemon_parsed += 1
                 else:
-                    print(f"Invalid: {file}")
+                    valid = False
+            if not valid:
+                print(f"Invalid: {file}, removing...")
+                os.remove(full_path)
 
 with open(OUT_FILE, "w") as f:
     json.dump(result, f, indent=2)
