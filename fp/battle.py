@@ -708,6 +708,29 @@ class Pokemon:
             pkmn.add_move(move)
         return pkmn
 
+    def get_mega(self) -> str:
+        if self.name == "rayquaza" and self.get_move("dragonascent") is not None:
+            return "rayquazamega"
+
+        working_pkmn_name = self.name
+        base_species = self.get_base_species()
+        if base_species is not None:
+            working_pkmn_name = base_species
+        other_formes = pokedex[working_pkmn_name].get("otherFormes", [])
+        for other_forme in other_formes:
+            other_forme = normalize_name(other_forme)
+            if (
+                pokedex[other_forme].get("forme") == "Mega"
+                and normalize_name(pokedex[other_forme].get("requiredItem"))
+                == self.item
+            ):
+                return other_forme
+
+    def get_base_species(self):
+        if "baseSpecies" in pokedex[self.name]:
+            return normalize_name(pokedex[self.name]["baseSpecies"])
+        return None
+
     def has_type(self, pkmn_type: str):
         if self.terastallized and self.tera_type != "stellar":
             return pkmn_type == self.tera_type
