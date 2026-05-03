@@ -4,6 +4,7 @@ from copy import deepcopy, copy
 import logging
 
 import constants
+from config import FoulPlayConfig
 from data import all_move_json
 from data import pokedex
 from data.pkmn_sets import (
@@ -327,6 +328,7 @@ def switch_or_drag(battle, split_msg, switch_or_drag="switch"):
             slot.active.hp > 0
             and not slot.active.fainted
             and slot.active.ability == "regenerator"
+            and "champions" not in FoulPlayConfig.pokemon_format
         ):
             health_healed = int(slot.active.max_hp / 3)
             slot.active.hp = min(slot.active.hp + health_healed, slot.active.max_hp)
