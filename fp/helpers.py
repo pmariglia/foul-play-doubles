@@ -1,6 +1,7 @@
 import math
 import constants
 from config import FoulPlayConfig
+from data import pokedex
 
 natures = {
     "lonely": {"plus": constants.ATTACK, "minus": constants.DEFENSE},
@@ -255,3 +256,29 @@ def is_super_effective(move_type, defending_pokemon_types):
 def is_not_very_effective(move_type, defending_pokemon_types):
     multiplier = type_effectiveness_modifier(move_type, defending_pokemon_types)
     return multiplier < 1
+
+
+def get_mega_formes(pkmn_name: str) -> list[str]:
+    pokedex_mega_forme_indicators = ["mega", "megax", "megay", "megaz"]
+    if normalize_name(pokedex[pkmn_name].get("forme", "")) in pokedex_mega_forme_indicators:
+        return []
+
+    other_formes = [
+        normalize_name(f) for f in pokedex[pkmn_name].get("otherFormes", [])
+    ]
+
+    base_species = normalize_name(pokedex[pkmn_name].get("baseSpecies", ""))
+    if base_species:
+        for bs_other_formes in pokedex[base_species].get("otherFormes", []):
+            other_formes.append(normalize_name(bs_other_formes))
+
+    mega_formes = []
+    for other_forme in other_formes:
+        other_forme_pokedex = pokedex[other_forme]
+        if normalize_name(other_forme_pokedex.get("forme", "")) in pokedex_mega_forme_indicators:
+            if "battleOnly" in other_forme_pokedex and normalize_name(other_forme_pokedex["battleOnly"]) != pkmn_name:
+                continue
+            else:
+                mega_formes.append(other_forme)
+
+    return mega_formes

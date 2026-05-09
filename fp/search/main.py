@@ -22,8 +22,6 @@ from fp.search.poke_engine_helpers import battle_to_poke_engine_state
 
 logger = logging.getLogger(__name__)
 
-NUM_RESERVES = 2
-
 
 def team_preview_shuffle(battle):
     """
@@ -37,21 +35,50 @@ def team_preview_shuffle(battle):
 
 def sample_pkmn_to_remove(pkmn_list: list[Pokemon]):
     # sample a non-restricted pokemon to remove if available, otherwise sample any pokemon
-    pkmn_to_sample_from = [
-        p
-        for p in pkmn_list
-        if p.name not in constants.RESTRICTED_POKEMON and not p.revealed
-    ] or [p for p in pkmn_list if not p.revealed]
+    pkmn_to_sample_from = (
+        [
+            p
+            for p in pkmn_list
+            if not p.revealed
+            and p.can_mega  # always remove megas first - a mega would've been sampled before this
+        ]
+        or [
+            p
+            for p in pkmn_list
+            if p.name not in constants.RESTRICTED_POKEMON
+            and not p.revealed
+            and not p.can_mega
+        ]
+        or [p for p in pkmn_list if not p.revealed]
+    )
     return random.choice(pkmn_to_sample_from)
+
+
+def sample_mega(pkmn_list: list[Pokemon]) -> Pokemon | None:
+    # if no mega has been revealed, and there are still pokemon to sample
+    # sample a mega-pkmn
+    revealed_pkmn = [p for p in pkmn_list if p.revealed]
+    revealed_mega_pkmn = len([p for p in revealed_pkmn if p.can_mega or p.is_mega])
+    if revealed_mega_pkmn:
+        return None
+
+    un_revealed_megas = [p for p in pkmn_list if not p.revealed and p.can_mega]
+    if un_revealed_megas:
+        return random.choice(un_revealed_megas)
+
+    return None
 
 
 def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, float)]:
     battle = deepcopy(battle)
-    num_reserves = NUM_RESERVES
+    num_reserves = 2
 
     battles = []
     for i in range(num_teams):
         battle_copy = deepcopy(battle)
+        sampled_mega = sample_mega(battle_copy.opponent.reserve)
+        if sampled_mega and battle_copy.opponent.num_revealed_pkmn() < 4:
+            sampled_mega.revealed = True
         while len(battle_copy.opponent.reserve) > num_reserves:
             pkmn = sample_pkmn_to_remove(battle_copy.opponent.reserve)
             battle_copy.opponent.reserve.remove(pkmn)
@@ -141,9 +168,19 @@ def get_result_from_mcts(state: str, search_time_ms: int, index: int) -> MctsRes
     return res
 
 
-def get_default_team_preview_options() -> list[(int, int, int, int)]:
+def get_default_team_preview_options(
+    pkmn_list: list[Pokemon],
+) -> list[(int, int, int, int)]:
     pokemon_indices = [0, 1, 2, 3, 4, 5]
     all_teams = [tuple(i) for i in combinations(pokemon_indices, 4)]
+
+    mega_count = sum(1 for p in pkmn_list if p.can_mega)
+    if 2 <= mega_count <= 3:
+        mega_indices = {i for i, p in enumerate(pkmn_list) if p.can_mega}
+        all_teams = [
+            team for team in all_teams if sum(1 for i in team if i in mega_indices) == 1
+        ]
+
     result = []
     for team in all_teams:
         all_leads = combinations(team, 2)
@@ -210,7 +247,7 @@ def get_teampreview_filters(
         result.append(
             TeamPreviewFilters(
                 side_one=our_side_filters,
-                side_two=get_default_team_preview_options(),
+                side_two=get_default_team_preview_options(battle.opponent.reserve),
             )
         )
 
@@ -270,7 +307,9 @@ def find_best_move_teampreview(battle):
 
     battles = get_battles_for_team_preview(battle, parallelism)
 
-    our_side_filter = TeamLeads.team_lead_indices or get_default_team_preview_options()
+    our_side_filter = TeamLeads.team_lead_indices or get_default_team_preview_options(
+        battle.user.reserve
+    )
     team_preview_filters = get_teampreview_filters(battle, our_side_filter, parallelism)
 
     num_battles = len(battles)

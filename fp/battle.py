@@ -9,7 +9,7 @@ from config import FoulPlayConfig
 from data import all_move_json
 from data import pokedex
 
-from fp.helpers import get_pokemon_info_from_condition
+from fp.helpers import get_pokemon_info_from_condition, get_mega_formes
 from fp.helpers import normalize_name
 from fp.helpers import calculate_stats
 
@@ -96,7 +96,22 @@ class Battle:
         self.battle_data = BattleData(set(), set(), False)
         self.previous_battle_data: list[BattleData] = []
 
-    def during_team_preview(self): ...
+    def check_mega_items(self):
+        for pkmn in self.user.reserve + self.opponent.reserve:
+            if pkmn.name == "rayquaza" and pkmn.get_move("dragonascent") is not None:
+                logger.info(
+                    f"{pkmn.name} can mega-evolve into rayquazamega with dragonascent"
+                )
+                pkmn.can_mega = True
+                continue
+
+            mega_formes = get_mega_formes(pkmn.name)
+            for mega_forme in mega_formes:
+                if normalize_name(pokedex[mega_forme]["requiredItem"]) == pkmn.item:
+                    logger.info(
+                        f"{pkmn.name} can mega-evolve into {mega_forme} with {pkmn.item}"
+                    )
+                    pkmn.can_mega = True
 
     def start_non_team_preview_battle(self, user_json, opponent_switch_string):
         self.user.initialize_first_turn_user_from_json(user_json)
@@ -259,7 +274,6 @@ class Slot:
     ):
         my_active_pkmn = request_json[constants.ACTIVE][active_index]
 
-        self.active.can_mega_evo = my_active_pkmn.get(constants.CAN_MEGA_EVO, False)
         self.active.can_ultra_burst = my_active_pkmn.get(
             constants.CAN_ULTRA_BURST, False
         )
@@ -609,6 +623,10 @@ class Battler:
             )
             logger.debug(f"{pkmn.name}, nature: {pkmn.nature}, evs: {pkmn.evs}")
 
+    def num_revealed_pkmn(self) -> int:
+        pkmn = self.reserve + [self.slot_a.active, self.slot_b.active]
+        return len([p for p in pkmn if p.revealed])
+
 
 class Pokemon:
     def __init__(
@@ -669,10 +687,10 @@ class Pokemon:
         self.rest_turns = 0
         self.sleep_turns = 0
         self.knocked_off = False
-        self.can_mega_evo = False
         self.can_ultra_burst = False
         self.can_dynamax = False
         self.can_terastallize = False
+        self.can_mega = False
         self.is_mega = False
         self.can_have_choice_item = True
         self.item_inferred = False

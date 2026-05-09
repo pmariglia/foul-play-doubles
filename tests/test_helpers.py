@@ -1,7 +1,7 @@
 import unittest
 
 from data.pkmn_sets import spreads_are_alike
-from fp.helpers import get_pokemon_info_from_condition
+from fp.helpers import get_pokemon_info_from_condition, get_mega_formes
 from fp.helpers import normalize_name
 
 
@@ -105,3 +105,28 @@ class TestGetPokemonInfoFromCondition(unittest.TestCase):
         self.assertEqual(
             (20, 100, "brn"), get_pokemon_info_from_condition(condition_string)
         )
+
+
+class TestGetMegaFormes(unittest.TestCase):
+    def test_basic_get_mega_forme(self):
+        self.assertEqual(["venusaurmega"], get_mega_formes("venusaur"))
+
+    def test_rayquaza_mega(self):
+        self.assertEqual(["rayquazamega"], get_mega_formes("rayquaza"))
+
+    def test_charizard_multiple_formes(self):
+        self.assertEqual(
+            ["charizardmegax", "charizardmegay"], get_mega_formes("charizard")
+        )
+
+    def test_already_megaed_pokemon_does_not_return_value(self):
+        self.assertEqual([], get_mega_formes("charizardmegay"))
+
+    def test_absol_multiple_formes(self):
+        self.assertEqual(["absolmega", "absolmegaz"], get_mega_formes("absol"))
+
+    def test_floette_eternal_mega_forme(self):
+        self.assertEqual(["floettemega"], get_mega_formes("floetteeternal"))
+
+    def test_regular_floette_cannot_mega(self):
+        self.assertEqual([], get_mega_formes("floette"))

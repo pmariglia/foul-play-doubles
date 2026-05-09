@@ -202,7 +202,6 @@ async def start_standard_battle(
     battle.opponent.from_packed_string(opponent_showteam)
 
     await get_first_request_json(ps_websocket_client, battle)
-    battle.during_team_preview()
 
     if first_battle:
         SmogonSets.initialize(
@@ -214,6 +213,7 @@ async def start_standard_battle(
     battle.user.reserve.insert(0, battle.user.slot_a.active)
     battle.user.slot_a.active = None
     battle.user.slot_b.active = None
+    battle.check_mega_items()
     await handle_team_preview(battle, ps_websocket_client)
     return battle
 

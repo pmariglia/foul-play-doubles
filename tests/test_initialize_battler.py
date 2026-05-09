@@ -704,7 +704,6 @@ class TestUpdateFromRequestJson(unittest.TestCase):
 
         self.battler.update_from_request_json(request_dict)
 
-        self.assertTrue(self.battler.slot_a.active.can_mega_evo)
         self.assertTrue(self.battler.slot_a.active.can_ultra_burst)
         self.assertTrue(self.battler.slot_a.active.can_dynamax)
         self.assertTrue(self.battler.slot_a.active.can_terastallize)
