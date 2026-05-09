@@ -3,7 +3,7 @@ import json
 import logging
 import traceback
 from copy import deepcopy
-from config import FoulPlayConfig, init_logging, BotModes
+from config import FoulPlayConfig, init_logging, BotModes, TeamLeads
 
 from teams import load_team, TeamListIterator
 from fp.run_battle import pokemon_battle
@@ -72,6 +72,8 @@ async def run_foul_play():
             else FoulPlayConfig.team_name
         )
         team_export, team_dict, file_name = load_team(team_name)
+        if FoulPlayConfig.team_leads is not None:
+            TeamLeads.set_team_leads(team_dict, FoulPlayConfig.team_leads)
         if FoulPlayConfig.bot_mode == BotModes.challenge_user:
             await ps_websocket_client.challenge_user(
                 FoulPlayConfig.user_to_challenge,

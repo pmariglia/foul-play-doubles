@@ -210,8 +210,8 @@ async def start_standard_battle(
         )
 
     SmogonSets.load_speed_ranges(battle)
-    battle.user.reserve.insert(0, battle.user.slot_a.active)
     battle.user.reserve.insert(0, battle.user.slot_b.active)
+    battle.user.reserve.insert(0, battle.user.slot_a.active)
     battle.user.slot_a.active = None
     battle.user.slot_b.active = None
     await handle_team_preview(battle, ps_websocket_client)

@@ -9,7 +9,7 @@ from poke_engine.poke_engine import TeamPreviewFilters
 import constants
 from data.pkmn_sets import SmogonSets
 from fp.battle import Battle, Pokemon, BattleData, Battler
-from config import FoulPlayConfig
+from config import FoulPlayConfig, TeamLeads
 
 from poke_engine import (
     State as PokeEngineState,
@@ -270,7 +270,7 @@ def find_best_move_teampreview(battle):
 
     battles = get_battles_for_team_preview(battle, parallelism)
 
-    our_side_filter = get_default_team_preview_options()
+    our_side_filter = TeamLeads.team_lead_indices or get_default_team_preview_options()
     team_preview_filters = get_teampreview_filters(battle, our_side_filter, parallelism)
 
     num_battles = len(battles)

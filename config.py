@@ -2,9 +2,10 @@ import argparse
 import logging
 import os
 import sys
+from dataclasses import dataclass
 from enum import Enum, auto
 from logging.handlers import RotatingFileHandler
-from typing import Optional
+from typing import Optional, Tuple
 
 
 class CustomFormatter(logging.Formatter):
@@ -62,6 +63,45 @@ class SaveReplay(Enum):
     on_loss = auto()
 
 
+@dataclass
+class _TeamLeads:
+    team_lead_indices: list[Tuple[int, int, int, int]] | None
+
+    def __init__(self):
+        self.team_lead_indices = None
+
+    @staticmethod
+    def validate(split_leads, team_pkmn_names):
+        for team in split_leads:
+            if not len(team) == 4:
+                raise ValueError(
+                    f"Invalid leads, all leads must have 4 pokemon: {team}"
+                )
+            for pkmn in team:
+                if pkmn not in team_pkmn_names:
+                    raise ValueError(f"Invalid leads, {pkmn} is not on this team")
+
+    def set_team_leads(self, team_dict: dict, leads_str: str):
+        team_pkmn_names = [pkmn["species"] for pkmn in team_dict]
+        split_leads = [l.split(",") for l in leads_str.split()]
+
+        self.validate(split_leads, team_pkmn_names)
+
+        team_pkmn_indices = {pkmn["species"]: i for (i, pkmn) in enumerate(team_dict)}
+        lead_indices = []
+        for team in split_leads:
+            lead_indices.append(
+                (
+                    team_pkmn_indices[team[0]],
+                    team_pkmn_indices[team[1]],
+                    team_pkmn_indices[team[2]],
+                    team_pkmn_indices[team[3]],
+                )
+            )
+
+        self.team_lead_indices = lead_indices
+
+
 class _FoulPlayConfig:
     battle_bot_module: str
     websocket_uri: str
@@ -75,6 +115,7 @@ class _FoulPlayConfig:
     parallelism: int
     run_count: int
     team_name: str
+    team_leads: str
     team_list: str = None
     user_to_challenge: str
     save_replay: SaveReplay
@@ -137,6 +178,14 @@ class _FoulPlayConfig:
             "If not set, defaults to the --pokemon-format value.",
         )
         parser.add_argument(
+            "--team-leads",
+            default=None,
+            help="A space-separated list of possible leads the bot should consider in team preview. "
+            "Format for a team is <lead1>,<lead2>,<bring1>,<bring2>. "
+            "e.g. 'incineroar,farigiraf,torkoal,crabominable incineroar,hatterene,torkoal,drampa'. "
+            "Defaults to all possible lead combinations",
+        )
+        parser.add_argument(
             "--save-replay",
             default="never",
             choices=[e.name for e in SaveReplay],
@@ -171,6 +220,7 @@ class _FoulPlayConfig:
         self.parallelism = args.search_parallelism
         self.run_count = args.run_count
         self.team_name = args.team_name or self.pokemon_format
+        self.team_leads = args.team_leads
         self.team_list = args.team_list
         self.user_to_challenge = args.user_to_challenge
         self.save_replay = SaveReplay[args.save_replay]
@@ -186,3 +236,4 @@ class _FoulPlayConfig:
 
 
 FoulPlayConfig = _FoulPlayConfig()
+TeamLeads = _TeamLeads()
