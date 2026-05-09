@@ -58,7 +58,7 @@ def sample_mega(pkmn_list: list[Pokemon]) -> Pokemon | None:
     # if no mega has been revealed, and there are still pokemon to sample
     # sample a mega-pkmn
     revealed_pkmn = [p for p in pkmn_list if p.revealed]
-    revealed_mega_pkmn = len([p for p in revealed_pkmn if p.can_mega or p.is_mega])
+    revealed_mega_pkmn = [p for p in revealed_pkmn if p.can_mega or p.is_mega]
     if revealed_mega_pkmn:
         return None
 
@@ -76,7 +76,10 @@ def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, floa
     battles = []
     for i in range(num_teams):
         battle_copy = deepcopy(battle)
-        sampled_mega = sample_mega(battle_copy.opponent.reserve)
+        sampled_mega = sample_mega(
+            battle_copy.opponent.reserve
+            + [battle_copy.opponent.slot_a.active, battle_copy.opponent.slot_b.active]
+        )
         if sampled_mega and battle_copy.opponent.num_revealed_pkmn() < 4:
             sampled_mega.revealed = True
         while len(battle_copy.opponent.reserve) > num_reserves:
