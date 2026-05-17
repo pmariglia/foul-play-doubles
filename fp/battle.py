@@ -908,3 +908,4 @@ class DamageDealt:
     percent_damage: float
     crit: bool
     spread: bool
+    additional_messages: list[str]

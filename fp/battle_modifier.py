@@ -2702,7 +2702,9 @@ def get_single_damage_dealt(
     need_to_find: str,
     next_messages: list[str],
 ) -> DamageDealt | None:
+    additional_messages = []
     for line in next_messages:
+        additional_messages.append(line)
         next_line_split = line.split("|")
         # if one of these strings appears in index 1 then
         # exit out since we are done with this pokemon's move
@@ -2741,6 +2743,7 @@ def get_single_damage_dealt(
             )
             potential_damage_dealt.percent_damage = damage_percentage
             potential_damage_dealt.target_slot = target_slot
+            potential_damage_dealt.additional_messages = additional_messages
             return potential_damage_dealt
 
 
@@ -2781,6 +2784,7 @@ def get_damage_dealt(battle, split_msg, next_messages) -> list[DamageDealt | Non
                 percent_damage=None,  # will be set later
                 crit=False,  # may be set later
                 spread=spread,
+                additional_messages=[],
             ),
             ntf,
             next_messages,
@@ -2789,6 +2793,16 @@ def get_damage_dealt(battle, split_msg, next_messages) -> list[DamageDealt | Non
             result.append(damage_dealt)
 
     return result
+
+
+def apply_additional_messages(battle_copy: Battle, additional_messages: list[str]):
+    for message in additional_messages:
+        split_msg = message.split("|")
+        match split_msg[1]:
+            case "-boost":
+                boost(battle_copy, split_msg)
+            case "-unboost":
+                unboost(battle_copy, split_msg)
 
 
 def _do_check(
@@ -2818,6 +2832,7 @@ def _do_check(
             battle_copy.opponent.slot_b.active.set_spread(
                 p.nature, ",".join(str(x) for x in p.evs)
             )
+        apply_additional_messages(battle_copy, damage_dealt.additional_messages)
 
         if check_type == "damage_received":
             if opponent_slot.identifier == "a":
