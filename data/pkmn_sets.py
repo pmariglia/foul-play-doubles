@@ -111,7 +111,7 @@ class PokemonSpread:
     count: int
 
     def spread_makes_sense(self, pkmn: Pokemon):
-        if self.evs[3] > 50 or natures[self.nature]["plus"] == constants.SPECIAL_ATTACK:
+        if self.evs[3] > 6 or natures[self.nature]["plus"] == constants.SPECIAL_ATTACK:
             has_special_move = any(
                 all_move_json.get(mv.name, {}).get(constants.CATEGORY, "")
                 == constants.SPECIAL
@@ -120,7 +120,7 @@ class PokemonSpread:
             if not has_special_move:
                 return False
 
-        if self.evs[1] > 50 or natures[self.nature]["plus"] == constants.ATTACK:
+        if self.evs[1] > 6 or natures[self.nature]["plus"] == constants.ATTACK:
             has_physical_move = any(
                 all_move_json.get(mv.name, {}).get(constants.CATEGORY, "")
                 == constants.PHYSICAL
@@ -307,7 +307,7 @@ class _SmogonSets:
     def _pokemon_set_makes_sense(self, pkmn: Pokemon, pkmn_set: PokemonSpread):
         # without a large amount in an offensive stat life orb and expert belt don't make sense
         if pkmn.item in ["lifeorb", "expertbelt"] and (
-            pkmn_set.evs[1] < 200 and pkmn_set.evs[3] < 200
+            pkmn_set.evs[1] < 10 and pkmn_set.evs[3] < 10
         ):
             return False
 
@@ -421,10 +421,18 @@ class _SmogonSets:
         for pkmn in opponent.reserve:
             pkmn_name = normalize_name(pkmn.name)
             mega_name = pkmn.get_mega()
-            self.pkmn_sets[pkmn_name] = get_default_sets()
-            logger.info(f"Initialized default sets for {pkmn_name}")
-            if pkmn_name not in data and mega_name and mega_name not in data:
-                logger.warning(f"Nothing found for {pkmn_name} in custom sets")
+            self.pkmn_sets[pkmn_name] = []
+            if not mega_name and pkmn_name not in data:
+                logger.warning(
+                    f"Nothing found for {pkmn_name} in custom sets, giving default sets"
+                )
+                self.pkmn_sets[pkmn_name] = get_default_sets()
+                continue
+            if mega_name and mega_name not in data:
+                logger.warning(
+                    f"Nothing found for {mega_name} in custom sets, giving default sets"
+                )
+                self.pkmn_sets[pkmn_name] = get_default_sets()
                 continue
             this_pkmn_data = data.get(mega_name) or data[pkmn_name]
             for pkmn_set in this_pkmn_data:
@@ -439,8 +447,6 @@ class _SmogonSets:
                     )
                     if existing_pkmn_spread is not None:
                         existing_pkmn_spread.count += 1
-                    elif pkmn_name not in self.pkmn_sets:
-                        self.pkmn_sets[pkmn_name] = [pkmn_spread]
                     else:
                         self.pkmn_sets[pkmn_name].append(pkmn_spread)
 
@@ -448,7 +454,7 @@ class _SmogonSets:
         if not self.pkmn_sets:
             logger.warning("Called `predict_set` when pkmn_sets was empty")
 
-        spreads = self.get_pokemon_from_sets(pkmn.name)
+        spreads = self.get_pokemon_sets_from_pokemon(pkmn)
         if not spreads:
             return None
 
@@ -463,7 +469,13 @@ class _SmogonSets:
 
         return random.choices(spreads, weights=[s.count for s in spreads], k=1)[0]
 
-    def get_pokemon_from_sets(self, pkmn_name: str):
+    def get_pokemon_sets_from_pokemon(self, pkmn: Pokemon):
+        if pkmn.mega_name:
+            pkmn_sets = self.pkmn_sets.get(pkmn.mega_name)
+            if pkmn_sets:
+                return pkmn_sets
+
+        pkmn_name = pkmn.name
         pkmn_sets = self.pkmn_sets.get(pkmn_name)
         if pkmn_sets:
             return pkmn_sets

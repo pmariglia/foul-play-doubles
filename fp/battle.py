@@ -103,6 +103,7 @@ class Battle:
                     f"{pkmn.name} can mega-evolve into rayquazamega with dragonascent"
                 )
                 pkmn.can_mega = True
+                pkmn.mega_name = "rayquazamega"
                 continue
 
             mega_formes = get_mega_formes(pkmn.name)
@@ -112,6 +113,7 @@ class Battle:
                         f"{pkmn.name} can mega-evolve into {mega_forme} with {pkmn.item}"
                     )
                     pkmn.can_mega = True
+                    pkmn.mega_name = mega_forme
 
     def start_non_team_preview_battle(self, user_json, opponent_switch_string):
         self.user.initialize_first_turn_user_from_json(user_json)
@@ -690,6 +692,7 @@ class Pokemon:
         self.can_ultra_burst = False
         self.can_dynamax = False
         self.can_terastallize = False
+        self.mega_name = None
         self.can_mega = False
         self.is_mega = False
         self.can_have_choice_item = True
@@ -726,7 +729,7 @@ class Pokemon:
             pkmn.add_move(move)
         return pkmn
 
-    def get_mega(self) -> str:
+    def get_mega(self) -> str | None:
         if self.name == "rayquaza" and self.get_move("dragonascent") is not None:
             return "rayquazamega"
 
@@ -743,6 +746,8 @@ class Pokemon:
                 == self.item
             ):
                 return other_forme
+
+        return None
 
     def get_base_species(self):
         if "baseSpecies" in pokedex[self.name]:

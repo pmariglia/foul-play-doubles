@@ -21,6 +21,7 @@ from fp.battle_modifier import (
     get_damage_dealt,
     faint,
     mega,
+    swap,
 )
 from fp.battle_modifier import terastallize
 from fp.battle_modifier import activate
@@ -2719,6 +2720,31 @@ class TestFaint(unittest.TestCase):
         split_msg = ["", "faint", "p1b: Dondozo"]
         faint(self.battle, split_msg)
         self.assertNotIn("commanding", self.battle.user.slot_a.active.volatile_statuses)
+
+
+class TestSwap(unittest.TestCase):
+    def setUp(self):
+        self.battle = Battle(None)
+        self.battle.user.name = "p1"
+        self.battle.opponent.name = "p2"
+
+        self.opponent_active_a = Pokemon("caterpie", 100)
+        self.battle.opponent.slot_a.active = self.opponent_active_a
+        self.battle.opponent.slot_a.active.ability = None
+
+        self.user_active = Pokemon("weedle", 100)
+        self.battle.user.slot_a.active = self.user_active
+
+    def test_basic_swap(self):
+        self.opponent_active_b = Pokemon("weedle", 100)
+        self.battle.opponent.slot_b.active = self.opponent_active_b
+        self.battle.opponent.slot_b.active.ability = None
+
+        # |swap|p2a: king eater|1|[from] move: Ally Switch
+        split_msg = ["", "swap", "p2a: Farigiraf", "1", "[from] move: Ally Switch"]
+        swap(self.battle, split_msg)
+        self.assertEqual(self.battle.opponent.slot_a.active, self.opponent_active_b)
+        self.assertEqual(self.battle.opponent.slot_b.active, self.opponent_active_a)
 
 
 class TestFormChange(unittest.TestCase):

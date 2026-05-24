@@ -1310,6 +1310,13 @@ def weather(battle, split_msg):
     #     side.active.ability = ability
 
 
+# swaps a with b for the side
+# this client only does doubles so no need to check where the protocol says we are swapping
+def swap(battle, split_msg):
+    side, _, _, _ = get_side_slot_active(battle, split_msg)
+    (side.slot_a.active, side.slot_b.active) = (side.slot_b.active, side.slot_a.active)
+
+
 def fieldstart(battle, split_msg):
     """Set the battle's field condition"""
     field_name = normalize_name(split_msg[2].split(":")[-1].strip())
@@ -2957,8 +2964,8 @@ def update_dataset_possibilities(
     check_lower_bound = True
     if check_type == "damage_dealt":
         opponent_slot = damage_dealt.attacker_slot
-        smogon_possibilities = SmogonSets.get_pokemon_from_sets(
-            opponent_slot.active.name
+        smogon_possibilities = SmogonSets.get_pokemon_sets_from_pokemon(
+            opponent_slot.active
         )
         user_percent_hp = round(
             damage_dealt.target_slot.active.hp / damage_dealt.target_slot.active.max_hp,
@@ -2972,8 +2979,8 @@ def update_dataset_possibilities(
         )
     elif check_type == "damage_received":
         opponent_slot = damage_dealt.target_slot
-        smogon_possibilities = SmogonSets.get_pokemon_from_sets(
-            damage_dealt.target_slot.active.name
+        smogon_possibilities = SmogonSets.get_pokemon_sets_from_pokemon(
+            damage_dealt.target_slot.active
         )
         opponent_percent_hp = round(
             opponent_slot.active.hp / opponent_slot.active.max_hp, 2
@@ -3264,6 +3271,7 @@ def process_battle_updates(battle: Battle):
             "-curestatus": curestatus,
             "-cureteam": cureteam,
             "-weather": weather,
+            "swap": swap,
             "-fieldstart": fieldstart,
             "-fieldend": fieldend,
             "-sidestart": sidestart,

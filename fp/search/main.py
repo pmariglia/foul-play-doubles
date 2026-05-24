@@ -166,7 +166,7 @@ def select_move_from_mcts_results(mcts_results: list[(MctsResult, float, int)]) 
 def get_result_from_mcts(state: str, search_time_ms: int, index: int) -> MctsResult:
     logger.debug("Calling with {} state: {}".format(index, state))
     poke_engine_state = PokeEngineState.from_string(state)
-    res = monte_carlo_tree_search(poke_engine_state, search_time_ms)
+    res = monte_carlo_tree_search(poke_engine_state, search_time_ms, threads=2)
     logger.info("Iterations {}: {}".format(index, res.total_visits))
     return res
 
@@ -264,9 +264,7 @@ def get_result_from_teampreview_mcts(
     logger.debug("Calling with {} state: {}".format(index, state))
     poke_engine_state = PokeEngineState.from_string(state)
     res = monte_carlo_tree_search_team_preview(
-        poke_engine_state,
-        team_preview_filter,
-        search_time_ms,
+        poke_engine_state, team_preview_filter, search_time_ms, threads=2
     )
     logger.info("Iterations {}: {}".format(index, res.total_visits))
     return res
