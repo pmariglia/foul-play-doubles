@@ -2807,8 +2807,10 @@ def apply_additional_messages(battle_copy: Battle, additional_messages: list[str
         split_msg = message.split("|")
         match split_msg[1]:
             case "-boost":
+                logger.info("Applying additional boost")
                 boost(battle_copy, split_msg)
             case "-unboost":
+                logger.info("Applying additional unboost")
                 unboost(battle_copy, split_msg)
 
 
@@ -2839,7 +2841,6 @@ def _do_check(
             battle_copy.opponent.slot_b.active.set_spread(
                 p.nature, ",".join(str(x) for x in p.evs)
             )
-        apply_additional_messages(battle_copy, damage_dealt.additional_messages)
 
         if check_type == "damage_received":
             if opponent_slot.identifier == "a":
@@ -3002,6 +3003,7 @@ def update_dataset_possibilities(
         logger.info("Skipping dataset check because no SmogonSets found")
         return
 
+    apply_additional_messages(battle_copy, damage_dealt.additional_messages)
     _do_check(
         battle_copy,
         opponent_slot,
