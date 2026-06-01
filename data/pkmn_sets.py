@@ -111,6 +111,9 @@ class PokemonSpread:
     count: int
 
     def spread_makes_sense(self, pkmn: Pokemon):
+        if pkmn.nature and self.nature != pkmn.nature:
+            return False
+
         if self.evs[3] > 6 or natures[self.nature]["plus"] == constants.SPECIAL_ATTACK:
             has_special_move = any(
                 all_move_json.get(mv.name, {}).get(constants.CATEGORY, "")
@@ -306,6 +309,9 @@ class _SmogonSets:
 
     def _pokemon_set_makes_sense(self, pkmn: Pokemon, pkmn_set: PokemonSpread):
         # without a large amount in an offensive stat life orb and expert belt don't make sense
+        if pkmn.nature and pkmn_set.nature != pkmn.nature:
+            return False
+
         if pkmn.item in ["lifeorb", "expertbelt"] and (
             pkmn_set.evs[1] < 10 and pkmn_set.evs[3] < 10
         ):

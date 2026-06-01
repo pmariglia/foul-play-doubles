@@ -151,6 +151,7 @@ def packed_to_dict(packed_string):
         this_pkmn["name"] = normalize_name(species) or normalize_name(nickname)
         this_pkmn["item"] = normalize_name(item)
         this_pkmn["ability"] = normalize_name(ability)
+        this_pkmn["nature"] = normalize_name(nature)
         this_pkmn["moves"] = [normalize_name(move) for move in moves.split(",") if move]
         this_pkmn["tera_type"] = normalize_name(rest.split(",")[-1])
         this_pkmn["level"] = int(level)

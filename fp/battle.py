@@ -363,6 +363,7 @@ class Battler:
             p = Pokemon(pkmn["name"], pkmn["level"])
             p.ability = pkmn["ability"]
             p.item = pkmn["item"]
+            p.nature = pkmn["nature"]
             p.tera_type = pkmn["tera_type"]
             for mv in pkmn["moves"]:
                 p.add_move(mv)
