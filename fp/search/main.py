@@ -73,6 +73,16 @@ def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, floa
     battle = deepcopy(battle)
     num_reserves = 2
 
+    remaining_spreads = SmogonSets.num_remaining_spreads(
+        [
+            battle.opponent.slot_a.active,
+            battle.opponent.slot_b.active,
+        ]
+        + battle.opponent.reserve
+    )
+    for k, v in remaining_spreads.items():
+        logger.info(f"{v:4} remaining spreads for {k}")
+
     battles = []
     for i in range(num_teams):
         battle_copy = deepcopy(battle)

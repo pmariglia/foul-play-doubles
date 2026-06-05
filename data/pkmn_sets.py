@@ -50,8 +50,7 @@ def spreads_are_alike(s1, s2):
 
     diff = [abs(i - j) for i, j in zip(s1, s2)]
 
-    # 24 is arbitrarily chosen as the threshold for EVs to be "alike"
-    return all(v <= 48 for v in diff)
+    return all(v <= 8 for v in diff)
 
 
 def get_default_sets():
@@ -427,7 +426,8 @@ class _SmogonSets:
         for pkmn in opponent.reserve:
             pkmn_name = normalize_name(pkmn.name)
             mega_name = pkmn.get_mega()
-            self.pkmn_sets[pkmn_name] = []
+            if pkmn_name not in self.pkmn_sets:
+                self.pkmn_sets[pkmn_name] = []
             if not mega_name and pkmn_name not in data:
                 logger.warning(
                     f"Nothing found for {pkmn_name} in custom sets, giving default sets"
@@ -455,6 +455,20 @@ class _SmogonSets:
                         existing_pkmn_spread.count += 1
                     else:
                         self.pkmn_sets[pkmn_name].append(pkmn_spread)
+
+    def num_remaining_spreads(self, pkmn_list: list[Pokemon]) -> dict[str, int]:
+        if not self.pkmn_sets:
+            logger.warning("Called `predict_set` when pkmn_sets was empty")
+
+        ret = {}
+        for pkmn in pkmn_list:
+            spreads = self.get_pokemon_sets_from_pokemon(pkmn)
+            if not spreads:
+                ret[pkmn.name] = 0
+            else:
+                ret[pkmn.name] = len(spreads)
+
+        return ret
 
     def get_random_spread(self, pkmn: Pokemon) -> Optional[PokemonSpread]:
         if not self.pkmn_sets:
