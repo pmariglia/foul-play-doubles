@@ -314,7 +314,7 @@ def find_best_move(battle):
 
 def find_best_move_teampreview(battle):
     parallelism = FoulPlayConfig.parallelism // 2
-    search_time_per_battle = min(40_000, FoulPlayConfig.search_time_ms * 2)
+    search_time_per_battle = min(30_000, FoulPlayConfig.search_time_ms * 2)
 
     battles = get_battles_for_team_preview(battle, parallelism)
 
