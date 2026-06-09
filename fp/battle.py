@@ -63,6 +63,11 @@ class BattleData:
     opponent_picks: set[str] | None
     win: bool
 
+    def is_similar(self, other: "BattleData") -> bool:
+        other_pkmn = list(other.opponent_leads) + list(other.opponent_picks)
+        our_pkmn = list(self.opponent_leads) + list(self.opponent_picks)
+        return all(p in other_pkmn for p in our_pkmn)
+
 
 class Battle:
     def __init__(self, battle_tag):

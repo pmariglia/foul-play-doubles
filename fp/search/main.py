@@ -33,7 +33,7 @@ def team_preview_shuffle(battle):
     battle.opponent.slot_b.active = battle.opponent.reserve.pop(0)
 
 
-def sample_pkmn_to_remove(pkmn_list: list[Pokemon]):
+def sample_pkmn_to_remove(pkmn_list: list[Pokemon], must_keep: list[str]):
     # sample a non-restricted pokemon to remove if available, otherwise sample any pokemon
     pkmn_to_sample_from = (
         [
@@ -42,6 +42,7 @@ def sample_pkmn_to_remove(pkmn_list: list[Pokemon]):
             if not p.revealed
             and p.can_mega  # always remove megas first - a mega would've been sampled before this
         ]
+        or [p for p in pkmn_list if not p.revealed and p.name not in must_keep]
         or [
             p
             for p in pkmn_list
@@ -54,7 +55,7 @@ def sample_pkmn_to_remove(pkmn_list: list[Pokemon]):
     return random.choice(pkmn_to_sample_from)
 
 
-def sample_mega(pkmn_list: list[Pokemon]) -> Pokemon | None:
+def sample_mega(pkmn_list: list[Pokemon], must_keep: list[str]) -> Pokemon | None:
     # if no mega has been revealed, and there are still pokemon to sample
     # sample a mega-pkmn
     revealed_pkmn = [p for p in pkmn_list if p.revealed]
@@ -63,15 +64,40 @@ def sample_mega(pkmn_list: list[Pokemon]) -> Pokemon | None:
         return None
 
     un_revealed_megas = [p for p in pkmn_list if not p.revealed and p.can_mega]
-    if un_revealed_megas:
-        return random.choice(un_revealed_megas)
+    must_keep_megas = [p for p in un_revealed_megas if p.name in must_keep]
+    if must_keep_megas:
+        un_revealed_megas = must_keep_megas
 
-    return None
+    return random.choice(un_revealed_megas) if un_revealed_megas else None
+
+
+def must_keep_from_previous_battle(battle: Battle) -> list[str]:
+    def get_matching_battle_data(
+        battle_data: BattleData, other_battle_data: list[BattleData]
+    ) -> BattleData | None:
+        matching_battle_data = []
+        for bd in other_battle_data:
+            if battle_data.is_similar(bd):
+                matching_battle_data.append(bd)
+
+        if not matching_battle_data:
+            return None
+
+        return random.choice(matching_battle_data)
+
+    matching_previous_battle = get_matching_battle_data(
+        battle.battle_data, battle.previous_battle_data
+    )
+    if matching_previous_battle is None:
+        return []
+
+    return list(matching_previous_battle.opponent_leads) + list(
+        matching_previous_battle.opponent_picks
+    )
 
 
 def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, float)]:
     battle = deepcopy(battle)
-    num_reserves = 2
 
     remaining_spreads = SmogonSets.num_remaining_spreads(
         [
@@ -86,14 +112,16 @@ def sample_unrevealed_pkmn(battle: Battle, num_teams: int) -> list[(Battle, floa
     battles = []
     for i in range(num_teams):
         battle_copy = deepcopy(battle)
+        must_keep = must_keep_from_previous_battle(battle_copy)
         sampled_mega = sample_mega(
             battle_copy.opponent.reserve
-            + [battle_copy.opponent.slot_a.active, battle_copy.opponent.slot_b.active]
+            + [battle_copy.opponent.slot_a.active, battle_copy.opponent.slot_b.active],
+            must_keep,
         )
         if sampled_mega and battle_copy.opponent.num_revealed_pkmn() < 4:
             sampled_mega.revealed = True
-        while len(battle_copy.opponent.reserve) > num_reserves:
-            pkmn = sample_pkmn_to_remove(battle_copy.opponent.reserve)
+        while len(battle_copy.opponent.reserve) > 2:
+            pkmn = sample_pkmn_to_remove(battle_copy.opponent.reserve, must_keep)
             battle_copy.opponent.reserve.remove(pkmn)
 
         assert len(battle_copy.opponent.reserve) == 2
@@ -238,32 +266,21 @@ def get_teampreview_filters(
 ) -> list[TeamPreviewFilters]:
     previous_battle_data = battle.previous_battle_data
 
-    result = []
-    for pbd in previous_battle_data:
-        side_two_filter = opponent_team_preview_side_filter(battle, pbd)
-        result.append(
-            TeamPreviewFilters(
-                side_one=our_side_filters,
-                side_two=side_two_filter,
-            )
-        )
-        if not pbd.win:
-            result.append(
-                TeamPreviewFilters(
-                    side_one=our_side_filters,
-                    side_two=side_two_filter,
-                )
-            )
+    # first game or we just won: consider all opponent choices
+    if len(previous_battle_data) == 0 or previous_battle_data[-1].win:
+        side_two_filter = get_default_team_preview_options(battle.opponent.reserve)
 
-    result = result[-parallelism:]
-    while len(result) < parallelism:
-        result.append(
-            TeamPreviewFilters(
-                side_one=our_side_filters,
-                side_two=get_default_team_preview_options(battle.opponent.reserve),
-            )
+    # we just lost: only consider the opponent's last choice
+    else:
+        side_two_filter = opponent_team_preview_side_filter(
+            battle, previous_battle_data[-1]
         )
 
+    tpf = TeamPreviewFilters(
+        side_one=our_side_filters,
+        side_two=side_two_filter,
+    )
+    result = [tpf] * parallelism
     return result
 
 
@@ -314,7 +331,7 @@ def find_best_move(battle):
 
 def find_best_move_teampreview(battle):
     parallelism = FoulPlayConfig.parallelism // 2
-    search_time_per_battle = min(30_000, FoulPlayConfig.search_time_ms * 2)
+    search_time_per_battle = min(25_000, FoulPlayConfig.search_time_ms * 2)
 
     battles = get_battles_for_team_preview(battle, parallelism)
 
