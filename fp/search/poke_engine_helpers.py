@@ -149,6 +149,8 @@ def slot_to_poke_engine_slot(
             if move == slot.last_used_move.move:
                 last_used_move = "move:{}".format(i)
                 break
+        else:
+            last_used_move = "move:0"
 
     # substitute health can't be known with certainty but the client can keep track of if the substitute was hit
     # to approximate: the substitute health is 1/10 of the pokemon's max_hp if it was hit, 1/4 if it wasn't
