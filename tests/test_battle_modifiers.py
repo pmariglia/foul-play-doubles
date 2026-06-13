@@ -2095,6 +2095,13 @@ class TestStartVolatileStatus(unittest.TestCase):
         self.user_active = Pokemon("weedle", 100)
         self.battle.user.slot_a.active = self.user_active
 
+    def test_sets_disabled_along_with_disabled_move(self):
+        split_msg = ["", "-start", "p2a: Caterpie", constants.DISABLE, "Brave Bird"]
+        start_volatile_status(self.battle, split_msg)
+        self.assertIn(
+            constants.DISABLE, self.battle.opponent.slot_a.active.volatile_statuses
+        )
+
     def test_sets_slowstart_duration_when_slowstart_activates(self):
         split_msg = ["", "-start", "p2a: Caterpie", "Slow Start"]
         start_volatile_status(self.battle, split_msg)
@@ -2385,6 +2392,27 @@ class TestEndVolatileStatus(unittest.TestCase):
             0,
             self.battle.opponent.slot_a.active.volatile_status_durations[
                 constants.SLOW_START
+            ],
+        )
+
+    def test_removes_disable_volatile_duration(self):
+        self.battle.opponent.slot_a.active.volatile_statuses = [constants.DISABLE]
+        self.battle.opponent.slot_a.active.volatile_status_durations[
+            constants.DISABLE
+        ] = 3
+        split_msg = [
+            "",
+            "-end",
+            "p2a: Caterpie",
+            "Disable",
+        ]
+        end_volatile_status(self.battle, split_msg)
+
+        self.assertEqual([], self.battle.opponent.slot_a.active.volatile_statuses)
+        self.assertEqual(
+            0,
+            self.battle.opponent.slot_a.active.volatile_status_durations[
+                constants.DISABLE
             ],
         )
 
@@ -3164,6 +3192,15 @@ class TestUpkeep(unittest.TestCase):
         self.user_active = Pokemon("weedle", 100)
         self.battle.user.slot_a.active = self.user_active
         self.battle.user.slot_b.active = Pokemon("beedrill", 100)
+
+    def test_increments_disable(self):
+        self.battle.user.slot_a.active.volatile_statuses.append(constants.DISABLE)
+        self.battle.user.slot_a.active.volatile_status_durations[constants.DISABLE] = 0
+        upkeep(self.battle, "")
+        self.assertEqual(
+            1,
+            self.battle.user.slot_a.active.volatile_status_durations[constants.DISABLE],
+        )
 
     def test_removes_helping_hand(self):
         self.battle.user.slot_a.active.volatile_statuses.append("helpinghand")

@@ -154,6 +154,7 @@ DAMAGING_CATEGORIES = [PHYSICAL, SPECIAL]
 
 VOLATILE_STATUS = "volatileStatus"
 LOCKED_MOVE = "lockedmove"
+DISABLE = "disable"
 
 # Side-Effects
 REFLECT = "reflect"

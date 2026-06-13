@@ -1040,6 +1040,11 @@ def start_volatile_status(battle, split_msg):
         )
         pkmn.volatile_statuses.append(volatile_status)
 
+    if volatile_status == constants.DISABLE:
+        disabled_move = normalize_name(split_msg[4])
+        pkmn.disabled_move = disabled_move
+        logger.info("{}'s {} was disabled".format(pkmn.name, disabled_move))
+
     if volatile_status == constants.SUBSTITUTE:
         if len(split_msg) >= 5 and split_msg[4] == "[from] move: Shed Tail":
             logger.info(
@@ -2041,6 +2046,15 @@ def upkeep(battle, _):
         battle.opponent.slot_b,
     ]:
         remove_volatile(slot.active, "helpinghand")
+
+        if constants.DISABLE in slot.active.volatile_statuses:
+            slot.active.volatile_status_durations[constants.DISABLE] += 1
+            logger.info(
+                "Incremented disable duration for {} to {}".format(
+                    slot.active.name,
+                    slot.active.volatile_status_durations[constants.DISABLE],
+                )
+            )
 
         if slot.active.volatile_status_durations[constants.PROTECT] > 0:
             slot.active.volatile_status_durations[constants.PROTECT] -= 1

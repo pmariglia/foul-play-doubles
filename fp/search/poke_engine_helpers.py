@@ -181,6 +181,27 @@ def slot_to_poke_engine_slot(
                     )
                 )
 
+    if constants.DISABLE in slot.active.volatile_statuses:
+        mv_index = slot.active.get_disabled_move_index()
+        match mv_index:
+            case -1:
+                # we need something for the disabled index, even if that move is not an option
+                # e.g. if you are encore/disabled and can only struggle, your disabled move won't match
+                # the list of available options
+                slot.active.volatile_statuses.append("disable0")
+            case 0:
+                slot.active.volatile_statuses.append("disable0")
+            case 1:
+                slot.active.volatile_statuses.append("disable1")
+            case 2:
+                slot.active.volatile_statuses.append("disable2")
+            case 3:
+                slot.active.volatile_statuses.append("disable3")
+            case _:
+                raise ValueError(
+                    f"disable volatile duration must be between -1 and 3, got {mv_index}"
+                )
+
     return PokeEngineSideSlot(
         active_index=active_index,
         baton_passing=slot.baton_passing,
@@ -196,6 +217,7 @@ def slot_to_poke_engine_slot(
             lockedmove=slot.active.volatile_status_durations[constants.LOCKED_MOVE],
             protect=slot.active.volatile_status_durations[constants.PROTECT],
             encore=slot.active.volatile_status_durations["encore"],
+            disable=slot.active.volatile_status_durations[constants.DISABLE],
             slowstart=slot.active.volatile_status_durations[constants.SLOW_START],
             taunt=slot.active.volatile_status_durations[constants.TAUNT],
             yawn=slot.active.volatile_status_durations[constants.YAWN],

@@ -687,6 +687,7 @@ class Pokemon:
         self.original_ability = None
         self.fainted = False
         self.reviving = False
+        self.disabled_move = None
         self.moves = []
         self.status = None
         self.volatile_statuses = []
@@ -734,6 +735,20 @@ class Pokemon:
         for move in pkmn_dict[constants.MOVES]:
             pkmn.add_move(move)
         return pkmn
+
+    def get_disabled_move_index(self):
+        if self.disabled_move is None:
+            raise ValueError(
+                "Called get_disabled_move_index when disabled_move was None"
+            )
+        for i, mv in enumerate(self.moves):
+            if mv.name == self.disabled_move:
+                return i
+
+        # used to indicate that the disabled move is not an available option
+        # this comes up in a few situations,
+        # e.g. when you are encore/disabled and can only struggle
+        return -1
 
     def get_mega(self) -> str | None:
         if self.name == "rayquaza" and self.get_move("dragonascent") is not None:

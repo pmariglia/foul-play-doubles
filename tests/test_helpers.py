@@ -25,8 +25,8 @@ class TestSpreadsAreAlike(unittest.TestCase):
         self.assertFalse(spreads_are_alike(s1, s2))
 
     def test_very_similar_returns_true(self):
-        s1 = ("modest", "16,0,0,252,0,240")
-        s2 = ("modest", "28,0,4,252,0,252")
+        s1 = ("modest", "4,0,0,32,0,29")
+        s2 = ("modest", "7,0,4,32,0,32")
 
         self.assertTrue(spreads_are_alike(s1, s2))
 
